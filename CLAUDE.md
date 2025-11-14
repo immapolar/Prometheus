@@ -2,6 +2,97 @@
 
 This document provides a comprehensive guide to the Prometheus codebase for AI assistants working on this project.
 
+---
+
+## ⚠️ CONSTITUTIONAL GUIDELINES - READ FIRST
+
+**These guidelines are MANDATORY and apply to ALL work on this codebase.**
+
+### Absolute Prohibitions
+
+There is **absolutely no space, tolerance, or leniency** for any form of:
+
+- ❌ **Assumptions** - Never assume anything about the codebase
+- ❌ **Guesses** - Never guess what code does or how it works
+- ❌ **Examples** - Never use example code in place of real implementation
+- ❌ **Code snippets as placeholders** - All code must be real and functional
+- ❌ **Simulation** - Never simulate functionality
+- ❌ **Demo code** - Never write demonstration code instead of production code
+- ❌ **Mock data** - Never use mock or fake data
+- ❌ **Placeholders** - Never use TODOs, FIXMEs, or placeholder values
+- ❌ **Simplification** - Never simplify complex logic to make it "easier"
+
+### Mandatory Requirements
+
+Every word, line, and action must be based on **complete and verified certainty**, and every step taken only after **full and absolute confidence** in its accuracy.
+
+There is **NO room** for:
+- Slow or simple learning
+- Clever experimentation
+- Partial implementations
+- "Good enough" solutions
+- Incremental development without full understanding
+
+### What is ALWAYS Required
+
+What is always required and expected — **without exception and at every stage**:
+
+- ✅ **Total and complete achievement** - Finish what you start
+- ✅ **Depth and precision** - Understand deeply, implement precisely
+- ✅ **Thorough understanding** - Read and comprehend before acting
+- ✅ **Careful study and mastery** - Study the codebase thoroughly
+- ✅ **Complete implementation** - Never leave things half-done
+
+### Implementation Standards
+
+When **building** something, the expectation is:
+- ✅ Complete and thorough construction
+- ✅ Executed with high level of depth and precision
+- ✅ Crafted carefully with **production-grade capabilities**
+- ✅ **NOT** development-level or prototype code
+- ✅ Fully tested and verified to work
+
+### Problem-Solving Standards
+
+When **solving** a problem, the solution must be based on:
+- ✅ Deep and precise analysis
+- ✅ Careful study and understanding
+- ✅ Comprehensive review of the project and its components
+- ✅ Practical and real solution (not theoretical)
+- ✅ Verification that the solution actually works
+
+### Analysis Standards
+
+For any **analysis or inspection** request:
+- ✅ Provide the requested analysis thoroughly
+- ✅ Base analysis on actual code examination
+- ✅ Verify findings by reading relevant files
+- ❌ Do **NOT** provide improvements, enhancements, or suggestions unless **explicitly authorized and specified**
+- ❌ Do **NOT** offer unsolicited advice
+
+### Workflow Requirements
+
+Before making ANY change:
+1. **Read** all relevant files completely
+2. **Understand** the existing implementation fully
+3. **Verify** your understanding is correct
+4. **Plan** the complete solution
+5. **Implement** the entire solution (not partial)
+6. **Test** thoroughly to ensure it works
+7. **Verify** the output matches expectations
+
+### Verification Before Action
+
+Before writing code:
+- Have you read ALL relevant existing code?
+- Do you understand the COMPLETE context?
+- Do you know with ABSOLUTE CERTAINTY what needs to be done?
+- Have you verified your understanding against the actual codebase?
+
+If the answer to ANY of these is "no" or "maybe", **STOP and gather more information first**.
+
+---
+
 ## Project Overview
 
 **Prometheus** is a Lua obfuscator written in pure Lua, inspired by the JavaScript obfuscator. It can obfuscate Lua 5.1 and Roblox's LuaU code through a configurable pipeline of obfuscation steps.
