@@ -158,7 +158,14 @@ function Unparser:unparseStatement(statement, tabbing)
 		code = "do" ..  self:whitespaceIfNeeded(bodyCode, self:newline(true))
 			.. bodyCode .. self:newline(false)
 			.. self:whitespaceIfNeeded2(bodyCode, self:tabs(tabbing, true)) .. "end";
-		
+
+	-- FiveM/Lua54 Defer Statement
+	elseif(statement.kind == AstKind.DeferStatement) then
+		local bodyCode = self:unparseBlock(statement.body, tabbing);
+		code = "defer" ..  self:whitespaceIfNeeded(bodyCode, self:newline(true))
+			.. bodyCode .. self:newline(false)
+			.. self:whitespaceIfNeeded2(bodyCode, self:tabs(tabbing, true)) .. "end";
+
 	-- While Statement
 	elseif(statement.kind == AstKind.WhileStatement) then
 		local expressionCode = self:unparseExpression(statement.condition, tabbing);
@@ -397,7 +404,26 @@ function Unparser:unparseStatement(statement, tabbing)
 		    [AstKind.CompoundPowStatement] = "^=",
 		    [AstKind.CompoundConcatStatement] = "..=",
 		}
-		
+
+		local operator = compoundOperators[statement.kind]
+		if operator then
+		    code = code .. self:unparseExpression(statement.lhs, tabbing) .. self:optionalWhitespace() .. operator .. self:optionalWhitespace() .. self:unparseExpression(statement.rhs, tabbing)
+		else
+		    logger:error(string.format("\"%s\" is not a valid unparseable statement in %s!", statement.kind, self.luaVersion))
+		end
+	elseif self.luaVersion == LuaVersion.Lua54 then
+		local compoundOperators = {
+		    [AstKind.CompoundAddStatement] = "+=",
+		    [AstKind.CompoundSubStatement] = "-=",
+		    [AstKind.CompoundMulStatement] = "*=",
+		    [AstKind.CompoundDivStatement] = "/=",
+		    [AstKind.CompoundLeftShiftStatement] = "<<=",
+		    [AstKind.CompoundRightShiftStatement] = ">>=",
+		    [AstKind.CompoundBitwiseAndStatement] = "&=",
+		    [AstKind.CompoundBitwiseOrStatement] = "|=",
+		    [AstKind.CompoundBitwiseXorStatement] = "^=",
+		}
+
 		local operator = compoundOperators[statement.kind]
 		if operator then
 		    code = code .. self:unparseExpression(statement.lhs, tabbing) .. self:optionalWhitespace() .. operator .. self:optionalWhitespace() .. self:unparseExpression(statement.rhs, tabbing)
@@ -901,7 +927,48 @@ function Unparser:unparseExpression(expression, tabbing)
 		code = code .. ")";
 		return code;
 	end
-	
+
+	-- FiveM/Lua54 Safe Member Expression: x?.name
+	k = AstKind.SafeMemberExpression;
+	if(expression.kind == k) then
+		local base = self:unparseExpression(expression.base, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.base.kind) > Ast.astKindExpressionToNumber(AstKind.IndexExpression)) then
+			base = "(" .. base .. ")";
+		end
+		return base .. "?." .. expression.property;
+	end
+
+	-- FiveM/Lua54 Safe Index Expression: x?.[expr]
+	k = AstKind.SafeIndexExpression;
+	if(expression.kind == k) then
+		local base = self:unparseExpression(expression.base, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.base.kind) > Ast.astKindExpressionToNumber(AstKind.IndexExpression)) then
+			base = "(" .. base .. ")";
+		end
+		local index = self:unparseExpression(expression.index, tabbing);
+		return base .. "?.[" .. index .. "]";
+	end
+
+	-- FiveM/Lua54 Safe Function Call Expression: x?.()
+	k = AstKind.SafeFunctionCallExpression;
+	if(expression.kind == k) then
+		local base = self:unparseExpression(expression.base, tabbing);
+		if not (expression.base.kind == AstKind.IndexExpression or expression.base.kind == AstKind.VariableExpression or
+		        expression.base.kind == AstKind.SafeIndexExpression or expression.base.kind == AstKind.SafeMemberExpression) then
+			base = "(" .. base .. ")";
+		end
+
+		code = base .. "?.(";
+		for i, arg in ipairs(expression.args) do
+			if i > 1 then
+				code = code .. "," .. self:optionalWhitespace();
+			end
+			code = code .. self:unparseExpression(arg, tabbing);
+		end
+		code = code .. ")";
+		return code;
+	end
+
 	k = AstKind.FunctionLiteralExpression;
 	if(expression.kind == k) then
 		code = "function" .. "(";

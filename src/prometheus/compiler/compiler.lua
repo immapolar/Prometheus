@@ -52,6 +52,13 @@ function Compiler:new()
             AstKind.DivExpression,
             AstKind.ModExpression,
             AstKind.PowExpression,
+            -- Lua 5.4 / FiveM Bitwise Operators
+            AstKind.BitwiseOrExpression,
+            AstKind.BitwiseAndExpression,
+            AstKind.BitwiseXorExpression,
+            AstKind.LeftShiftExpression,
+            AstKind.RightShiftExpression,
+            AstKind.FloorDivExpression,
         };
     };
 
@@ -1523,6 +1530,12 @@ function Compiler:compileStatement(statement, funcDepth)
         return;
     end
 
+    -- Defer Statement (FiveM/Lua54)
+    if(statement.kind == AstKind.DeferStatement) then
+        self:compileBlock(statement.body, funcDepth);
+        return;
+    end
+
     -- While Statement
     if(statement.kind == AstKind.WhileStatement) then
         local innerBlock = self:createBlock();
@@ -1760,6 +1773,12 @@ function Compiler:compileStatement(statement, funcDepth)
         return;
     end
 
+    -- Defer Statement (FiveM/Lua54)
+    if(statement.kind == AstKind.DeferStatement) then
+        self:compileBlock(statement.body, funcDepth);
+        return;
+    end
+
     -- Break Statement
     if(statement.kind == AstKind.BreakStatement) then
         local toFreeVars = {};
@@ -1833,6 +1852,12 @@ function Compiler:compileStatement(statement, funcDepth)
         [AstKind.CompoundModStatement] = Ast.CompoundModStatement,
         [AstKind.CompoundPowStatement] = Ast.CompoundPowStatement,
         [AstKind.CompoundConcatStatement] = Ast.CompoundConcatStatement,
+        -- FiveM/Lua54 Bitwise Compound Statements
+        [AstKind.CompoundLeftShiftStatement] = Ast.CompoundLeftShiftStatement,
+        [AstKind.CompoundRightShiftStatement] = Ast.CompoundRightShiftStatement,
+        [AstKind.CompoundBitwiseAndStatement] = Ast.CompoundBitwiseAndStatement,
+        [AstKind.CompoundBitwiseOrStatement] = Ast.CompoundBitwiseOrStatement,
+        [AstKind.CompoundBitwiseXorStatement] = Ast.CompoundBitwiseXorStatement,
     }
     if compoundConstructors[statement.kind] then
         local compoundConstructor = compoundConstructors[statement.kind];
@@ -2108,6 +2133,86 @@ function Compiler:compileExpression(expression, funcDepth, numReturns)
         return regs;
     end
 
+    -- Safe Navigation Expressions (FiveM/Lua54)
+    -- Desugar: x?.y  =>  x == nil and nil or x.y
+    if(expression.kind == AstKind.SafeMemberExpression) then
+        local regs = {};
+        for i=1, numReturns do
+            regs[i] = self:allocRegister();
+            if(i == 1) then
+                local baseReg = self:compileExpression(expression.base, funcDepth, 1)[1];
+                -- Create: base == nil and nil or base.property
+                local nilCheck = Ast.EqualsExpression(self:register(scope, baseReg), Ast.NilExpression());
+                local memberAccess = Ast.IndexExpression(self:register(scope, baseReg), Ast.StringExpression(expression.property));
+                local safeAccess = Ast.OrExpression(Ast.AndExpression(nilCheck, Ast.NilExpression()), memberAccess);
+
+                self:addStatement(self:setRegister(scope, regs[i], safeAccess), {regs[i]}, {baseReg}, true);
+                self:freeRegister(baseReg, false);
+            else
+               self:addStatement(self:setRegister(scope, regs[i], Ast.NilExpression()), {regs[i]}, {}, false);
+            end
+        end
+        return regs;
+    end
+
+    if(expression.kind == AstKind.SafeIndexExpression) then
+        local regs = {};
+        for i=1, numReturns do
+            regs[i] = self:allocRegister();
+            if(i == 1) then
+                local baseReg = self:compileExpression(expression.base, funcDepth, 1)[1];
+                local indexReg = self:compileExpression(expression.index, funcDepth, 1)[1];
+                -- Create: base == nil and nil or base[index]
+                local nilCheck = Ast.EqualsExpression(self:register(scope, baseReg), Ast.NilExpression());
+                local indexAccess = Ast.IndexExpression(self:register(scope, baseReg), self:register(scope, indexReg));
+                local safeAccess = Ast.OrExpression(Ast.AndExpression(nilCheck, Ast.NilExpression()), indexAccess);
+
+                self:addStatement(self:setRegister(scope, regs[i], safeAccess), {regs[i]}, {baseReg, indexReg}, true);
+                self:freeRegister(baseReg, false);
+                self:freeRegister(indexReg, false);
+            else
+               self:addStatement(self:setRegister(scope, regs[i], Ast.NilExpression()), {regs[i]}, {}, false);
+            end
+        end
+        return regs;
+    end
+
+    if(expression.kind == AstKind.SafeFunctionCallExpression) then
+        local regs = {};
+        for i=1, numReturns do
+            regs[i] = self:allocRegister();
+            if(i == 1) then
+                local baseReg = self:compileExpression(expression.base, funcDepth, 1)[1];
+                -- Compile arguments
+                local argRegs = {};
+                for j, arg in ipairs(expression.args) do
+                    argRegs[j] = self:compileExpression(arg, funcDepth, 1)[1];
+                end
+                -- Create: base == nil and nil or base(args...)
+                local nilCheck = Ast.EqualsExpression(self:register(scope, baseReg), Ast.NilExpression());
+                local callExpr = Ast.FunctionCallExpression(self:register(scope, baseReg), {});
+                for j, argReg in ipairs(argRegs) do
+                    callExpr.args[j] = self:register(scope, argReg);
+                end
+                local safeCall = Ast.OrExpression(Ast.AndExpression(nilCheck, Ast.NilExpression()), callExpr);
+
+                local freeRegs = {baseReg};
+                for j, argReg in ipairs(argRegs) do
+                    table.insert(freeRegs, argReg);
+                end
+
+                self:addStatement(self:setRegister(scope, regs[i], safeCall), {regs[i]}, freeRegs, true);
+                self:freeRegister(baseReg, false);
+                for j, argReg in ipairs(argRegs) do
+                    self:freeRegister(argReg, false);
+                end
+            else
+               self:addStatement(self:setRegister(scope, regs[i], Ast.NilExpression()), {regs[i]}, {}, false);
+            end
+        end
+        return regs;
+    end
+
     -- Binary Operations
     if(self.BIN_OPS[expression.kind]) then
         local regs = {};
@@ -2135,6 +2240,23 @@ function Compiler:compileExpression(expression, funcDepth, numReturns)
                 local rhsReg = self:compileExpression(expression.rhs, funcDepth, 1)[1];
 
                 self:addStatement(self:setRegister(scope, regs[i], Ast.NotExpression(self:register(scope, rhsReg))), {regs[i]}, {rhsReg}, false);
+                self:freeRegister(rhsReg, false)
+            else
+               self:addStatement(self:setRegister(scope, regs[i], Ast.NilExpression()), {regs[i]}, {}, false);
+            end
+        end
+        return regs;
+    end
+
+    -- Lua 5.4 / FiveM Unary Bitwise NOT
+    if(expression.kind == AstKind.BitwiseNotExpression) then
+        local regs = {};
+        for i=1, numReturns do
+            regs[i] = self:allocRegister();
+            if(i == 1) then
+                local rhsReg = self:compileExpression(expression.rhs, funcDepth, 1)[1];
+
+                self:addStatement(self:setRegister(scope, regs[i], Ast.BitwiseNotExpression(self:register(scope, rhsReg))), {regs[i]}, {rhsReg}, false);
                 self:freeRegister(rhsReg, false)
             else
                self:addStatement(self:setRegister(scope, regs[i], Ast.NilExpression()), {regs[i]}, {}, false);
