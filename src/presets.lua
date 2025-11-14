@@ -239,5 +239,59 @@ return {
                 }
             }
         }
+    };
+    ["Lua54"] = {
+        -- Lua 5.4 minification preset for FiveM (2025+)
+        LuaVersion = "Lua54";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 0;
+        -- Minimal obfuscation for testing Lua 5.4 syntax
+        Steps = {}
+    };
+    ["Lua54Strong"] = {
+        -- Lua 5.4 with full obfuscation for FiveM (2025+)
+        LuaVersion = "Lua54";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = os.time();
+        Steps = {
+            {
+                Name = "EncryptStrings";
+                Settings = {
+                    UseStrong = false;
+                    SimulateByteString = true;
+                    MinLength = 3;
+                };
+            },
+            {
+                Name = "ConstantArray";
+                Settings = {
+                    Treshold = 1;
+                    StringsOnly = true;
+                    Shuffle = true;
+                    Rotate = false;
+                    LocalWrapperTreshold = 0;
+                    MaxArraySize = 150;
+                };
+            },
+            {
+                Name = "NumbersToExpressions";
+                Settings = {
+                    Treshold = 1;
+                    MaxDepth = 1;
+                    UseBitwise = true;  -- Can use Lua 5.4 bitwise operators!
+                };
+            },
+            {
+                Name = "WrapInFunction";
+                Settings = {
+                    Iterations = 1;
+                    LocalsCount = 2;
+                };
+            },
+        }
     }
 }
