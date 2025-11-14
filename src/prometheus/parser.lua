@@ -318,7 +318,7 @@ function Parser:statement(scope, currentLoop)
 		end
 		
 		-- Local Variable Declaration
-		local ids = self:nameList(scope);
+		local ids, attributes = self:nameList(scope);
 		local expressions = {};
 		if(consume(self, TokenKind.Symbol, "=")) then
 			expressions = self:exprList(scope);
@@ -326,14 +326,14 @@ function Parser:statement(scope, currentLoop)
 
 		-- Variables can only be reffered to in the next statement, so the id's are enabled after the expressions have been parsed
 		self:enableNameList(scope, ids);
-		
+
 		if(#expressions > #ids) then
 			logger:warn(generateWarning(peek(self, -1), string.format("assigning %d values to %d variable" .. ((#ids > 1 and "s") or ""), #expressions, #ids)));
 		elseif(#ids > #expressions and #expressions > 0 and not ASSIGNMENT_NO_WARN_LOOKUP[expressions[#expressions].kind]) then
-			logger:warn(generateWarning(peek(self, -1), string.format("assigning %d value" .. ((#expressions > 1 and "s") or "") .. 
+			logger:warn(generateWarning(peek(self, -1), string.format("assigning %d value" .. ((#expressions > 1 and "s") or "") ..
 				" to %d variables initializes extra variables with nil, add a nil value to silence", #expressions, #ids)));
-		end		
-		return Ast.LocalVariableDeclaration(scope, ids, expressions);
+		end
+		return Ast.LocalVariableDeclaration(scope, ids, expressions, attributes);
 	end
 	
 	-- For Statement
@@ -511,18 +511,39 @@ end
 -- list of local variable names
 function Parser:nameList(scope)
 	local ids = {};
-	
+	local attributes = {};
+
 	local ident = expect(self, TokenKind.Ident);
 	local id = scope:addDisabledVariable(ident.value, ident);
+
+	-- Parse optional attribute (<const> or <close>)
+	local attribute = nil;
+	if(consume(self, TokenKind.Symbol, "<")) then
+		local attrName = expect(self, TokenKind.Ident);
+		expect(self, TokenKind.Symbol, ">");
+		attribute = attrName.value;
+	end
+
 	table.insert(ids, id);
-	
+	attributes[id] = attribute;
+
 	while(consume(self, TokenKind.Symbol, ",")) do
 		ident = expect(self, TokenKind.Ident);
 		id = scope:addDisabledVariable(ident.value, ident);
+
+		-- Parse optional attribute
+		attribute = nil;
+		if(consume(self, TokenKind.Symbol, "<")) then
+			local attrName = expect(self, TokenKind.Ident);
+			expect(self, TokenKind.Symbol, ">");
+			attribute = attrName.value;
+		end
+
 		table.insert(ids, id);
+		attributes[id] = attribute;
 	end
-	
-	return ids;
+
+	return ids, attributes;
 end
 
 function Parser:enableNameList(scope, list)
@@ -587,41 +608,41 @@ function Parser:expressionAnd(scope)
 end
 
 function Parser:expressionComparision(scope)
-	local curr = self:expressionStrCat(scope);
+	local curr = self:expressionBitwiseOr(scope);
 	repeat
 		local found = false;
 		if(consume(self, TokenKind.Symbol, "<")) then
-			local rhs = self:expressionStrCat(scope);
+			local rhs = self:expressionBitwiseOr(scope);
 			curr = Ast.LessThanExpression(curr, rhs, true);
 			found = true;
 		end
-		
+
 		if(consume(self, TokenKind.Symbol, ">")) then
-			local rhs = self:expressionStrCat(scope);
+			local rhs = self:expressionBitwiseOr(scope);
 			curr = Ast.GreaterThanExpression(curr, rhs, true);
 			found = true;
 		end
-		
+
 		if(consume(self, TokenKind.Symbol, "<=")) then
-			local rhs = self:expressionStrCat(scope);
+			local rhs = self:expressionBitwiseOr(scope);
 			curr = Ast.LessThanOrEqualsExpression(curr, rhs, true);
 			found = true;
 		end
-	
+
 		if(consume(self, TokenKind.Symbol, ">=")) then
-			local rhs = self:expressionStrCat(scope);
+			local rhs = self:expressionBitwiseOr(scope);
 			curr = Ast.GreaterThanOrEqualsExpression(curr, rhs, true);
 			found = true;
 		end
-		
+
 		if(consume(self, TokenKind.Symbol, "~=")) then
-			local rhs = self:expressionStrCat(scope);
+			local rhs = self:expressionBitwiseOr(scope);
 			curr = Ast.NotEqualsExpression(curr, rhs, true);
 			found = true;
 		end
-	
+
 		if(consume(self, TokenKind.Symbol, "==")) then
-			local rhs = self:expressionStrCat(scope);
+			local rhs = self:expressionBitwiseOr(scope);
 			curr = Ast.EqualsExpression(curr, rhs, true);
 			found = true;
 		end
@@ -630,8 +651,53 @@ function Parser:expressionComparision(scope)
 	return curr;
 end
 
+function Parser:expressionBitwiseOr(scope)
+	local curr = self:expressionBitwiseXor(scope);
+
+	repeat
+		local found = false;
+		if(consume(self, TokenKind.Symbol, "|")) then
+			local rhs = self:expressionBitwiseXor(scope);
+			curr = Ast.BitwiseOrExpression(curr, rhs, true);
+			found = true;
+		end
+	until not found;
+
+	return curr;
+end
+
+function Parser:expressionBitwiseXor(scope)
+	local curr = self:expressionBitwiseAnd(scope);
+
+	repeat
+		local found = false;
+		if(consume(self, TokenKind.Symbol, "~")) then
+			local rhs = self:expressionBitwiseAnd(scope);
+			curr = Ast.BitwiseXorExpression(curr, rhs, true);
+			found = true;
+		end
+	until not found;
+
+	return curr;
+end
+
+function Parser:expressionBitwiseAnd(scope)
+	local curr = self:expressionStrCat(scope);
+
+	repeat
+		local found = false;
+		if(consume(self, TokenKind.Symbol, "&")) then
+			local rhs = self:expressionStrCat(scope);
+			curr = Ast.BitwiseAndExpression(curr, rhs, true);
+			found = true;
+		end
+	until not found;
+
+	return curr;
+end
+
 function Parser:expressionStrCat(scope)
-	local lhs = self:expressionAddSub(scope);
+	local lhs = self:expressionShift(scope);
 
 	if(consume(self, TokenKind.Symbol, "..")) then
 		local rhs = self:expressionStrCat(scope);
@@ -639,6 +705,27 @@ function Parser:expressionStrCat(scope)
 	end
 
 	return lhs;
+end
+
+function Parser:expressionShift(scope)
+	local curr = self:expressionAddSub(scope);
+
+	repeat
+		local found = false;
+		if(consume(self, TokenKind.Symbol, "<<")) then
+			local rhs = self:expressionAddSub(scope);
+			curr = Ast.LeftShiftExpression(curr, rhs, true);
+			found = true;
+		end
+
+		if(consume(self, TokenKind.Symbol, ">>")) then
+			local rhs = self:expressionAddSub(scope);
+			curr = Ast.RightShiftExpression(curr, rhs, true);
+			found = true;
+		end
+	until not found;
+
+	return curr;
 end
 
 function Parser:expressionAddSub(scope)
@@ -673,7 +760,13 @@ function Parser:expressionMulDivMod(scope)
 			curr = Ast.MulExpression(curr, rhs, true);
 			found = true;
 		end
-	
+
+		if(consume(self, TokenKind.Symbol, "//")) then
+			local rhs = self:expressionUnary(scope);
+			curr = Ast.FloorDivExpression(curr, rhs, true);
+			found = true;
+		end
+
 		if(consume(self, TokenKind.Symbol, "/")) then
 			local rhs = self:expressionUnary(scope);
 			curr = Ast.DivExpression(curr, rhs, true);
@@ -695,15 +788,20 @@ function Parser:expressionUnary(scope)
 		local rhs = self:expressionUnary(scope);
 		return Ast.NotExpression(rhs, true);
 	end
-	
+
 	if(consume(self, TokenKind.Symbol, "#")) then
 		local rhs = self:expressionUnary(scope);
 		return Ast.LenExpression(rhs, true);
 	end
-	
+
 	if(consume(self, TokenKind.Symbol, "-")) then
 		local rhs = self:expressionUnary(scope);
 		return Ast.NegateExpression(rhs, true);
+	end
+
+	if(consume(self, TokenKind.Symbol, "~")) then
+		local rhs = self:expressionUnary(scope);
+		return Ast.BitwiseNotExpression(rhs, true);
 	end
 
 	return self:expressionPow(scope);

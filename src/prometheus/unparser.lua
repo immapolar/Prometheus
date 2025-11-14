@@ -296,12 +296,17 @@ function Unparser:unparseStatement(statement, tabbing)
 	-- Local Variable Declaration
 	elseif(statement.kind == AstKind.LocalVariableDeclaration) then
 		code = "local" .. self:whitespace();
-		
+
 		for i, id in ipairs(statement.ids) do
 			if i > 1 then
 				code = code .. "," .. self:optionalWhitespace();
 			end
 			code = code .. statement.scope:getVariableName(id);
+
+			-- Add attribute if present (Lua 5.4)
+			if statement.attributes and statement.attributes[id] then
+				code = code .. self:optionalWhitespace() .. "<" .. statement.attributes[id] .. ">";
+			end
 		end
 
 		if(#statement.expressions > 0) then
@@ -586,7 +591,82 @@ function Unparser:unparseExpression(expression, tabbing)
 
 		return lhs .. self:optionalWhitespace() .. "==" .. self:optionalWhitespace() .. rhs;
 	end
-	
+
+	k = AstKind.BitwiseOrExpression;
+	if(expression.kind == k) then
+		local lhs = self:unparseExpression(expression.lhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.lhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			lhs = "(" .. lhs .. ")";
+		end
+
+		local rhs = self:unparseExpression(expression.rhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.rhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			rhs = "(" .. rhs .. ")";
+		end
+
+		return lhs .. self:optionalWhitespace() .. "|" .. self:optionalWhitespace() .. rhs;
+	end
+
+	k = AstKind.BitwiseXorExpression;
+	if(expression.kind == k) then
+		local lhs = self:unparseExpression(expression.lhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.lhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			lhs = "(" .. lhs .. ")";
+		end
+
+		local rhs = self:unparseExpression(expression.rhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.rhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			rhs = "(" .. rhs .. ")";
+		end
+
+		return lhs .. self:optionalWhitespace() .. "~" .. self:optionalWhitespace() .. rhs;
+	end
+
+	k = AstKind.BitwiseAndExpression;
+	if(expression.kind == k) then
+		local lhs = self:unparseExpression(expression.lhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.lhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			lhs = "(" .. lhs .. ")";
+		end
+
+		local rhs = self:unparseExpression(expression.rhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.rhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			rhs = "(" .. rhs .. ")";
+		end
+
+		return lhs .. self:optionalWhitespace() .. "&" .. self:optionalWhitespace() .. rhs;
+	end
+
+	k = AstKind.LeftShiftExpression;
+	if(expression.kind == k) then
+		local lhs = self:unparseExpression(expression.lhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.lhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			lhs = "(" .. lhs .. ")";
+		end
+
+		local rhs = self:unparseExpression(expression.rhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.rhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			rhs = "(" .. rhs .. ")";
+		end
+
+		return lhs .. self:optionalWhitespace() .. "<<" .. self:optionalWhitespace() .. rhs;
+	end
+
+	k = AstKind.RightShiftExpression;
+	if(expression.kind == k) then
+		local lhs = self:unparseExpression(expression.lhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.lhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			lhs = "(" .. lhs .. ")";
+		end
+
+		local rhs = self:unparseExpression(expression.rhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.rhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			rhs = "(" .. rhs .. ")";
+		end
+
+		return lhs .. self:optionalWhitespace() .. ">>" .. self:optionalWhitespace() .. rhs;
+	end
+
 	k = AstKind.StrCatExpression;
 	if(expression.kind == k) then
 		local lhs = self:unparseExpression(expression.lhs, tabbing);
@@ -669,7 +749,22 @@ function Unparser:unparseExpression(expression, tabbing)
 
 		return lhs .. self:optionalWhitespace() .. "/" .. self:optionalWhitespace() .. rhs;
 	end
-	
+
+	k = AstKind.FloorDivExpression;
+	if(expression.kind == k) then
+		local lhs = self:unparseExpression(expression.lhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.lhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			lhs = "(" .. lhs .. ")";
+		end
+
+		local rhs = self:unparseExpression(expression.rhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.rhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			rhs = "(" .. rhs .. ")";
+		end
+
+		return lhs .. self:optionalWhitespace() .. "//" .. self:optionalWhitespace() .. rhs;
+	end
+
 	k = AstKind.ModExpression;
 	if(expression.kind == k) then
 		local lhs = self:unparseExpression(expression.lhs, tabbing);
@@ -734,7 +829,17 @@ function Unparser:unparseExpression(expression, tabbing)
 
 		return "#" .. rhs;
 	end
-	
+
+	k = AstKind.BitwiseNotExpression;
+	if(expression.kind == k) then
+		local rhs = self:unparseExpression(expression.rhs, tabbing);
+		if(Ast.astKindExpressionToNumber(expression.rhs.kind) >= Ast.astKindExpressionToNumber(k)) then
+			rhs = "(" .. rhs .. ")";
+		end
+
+		return "~" .. rhs;
+	end
+
 	k = AstKind.IndexExpression;
 	if(expression.kind == k or expression.kind == AstKind.AssignmentIndexing) then
 		local base = self:unparseExpression(expression.base, tabbing);

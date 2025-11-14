@@ -58,7 +58,14 @@ local AstKind = {
 	SubExpression = "SubExpression";
 	MulExpression = "MulExpression";
 	DivExpression = "DivExpression";
+	FloorDivExpression = "FloorDivExpression";
 	ModExpression = "ModExpression";
+	BitwiseAndExpression = "BitwiseAndExpression";
+	BitwiseOrExpression = "BitwiseOrExpression";
+	BitwiseXorExpression = "BitwiseXorExpression";
+	BitwiseNotExpression = "BitwiseNotExpression";
+	LeftShiftExpression = "LeftShiftExpression";
+	RightShiftExpression = "RightShiftExpression";
 	NotExpression = "NotExpression";
 	LenExpression = "LenExpression";
 	NegateExpression = "NegateExpression";
@@ -84,32 +91,39 @@ local astKindExpressionLookup = {
 	[AstKind.StringExpression] = 0;
 	[AstKind.NilExpression] = 0;
 	[AstKind.VarargExpression] = 0;
-	[AstKind.OrExpression] = 12;
-	[AstKind.AndExpression] = 11;
-	[AstKind.LessThanExpression] = 10;
-	[AstKind.GreaterThanExpression] = 10;
-	[AstKind.LessThanOrEqualsExpression] = 10;
-	[AstKind.GreaterThanOrEqualsExpression] = 10;
-	[AstKind.NotEqualsExpression] = 10;
-	[AstKind.EqualsExpression] = 10;
-	[AstKind.StrCatExpression] = 9;
-	[AstKind.AddExpression] = 8;
-	[AstKind.SubExpression] = 8;
-	[AstKind.MulExpression] = 7;
-	[AstKind.DivExpression] = 7;
-	[AstKind.ModExpression] = 7;
-	[AstKind.NotExpression] = 5;
-	[AstKind.LenExpression] = 5;
-	[AstKind.NegateExpression] = 5;
-	[AstKind.PowExpression] = 4;
+	[AstKind.OrExpression] = 14;
+	[AstKind.AndExpression] = 13;
+	[AstKind.LessThanExpression] = 12;
+	[AstKind.GreaterThanExpression] = 12;
+	[AstKind.LessThanOrEqualsExpression] = 12;
+	[AstKind.GreaterThanOrEqualsExpression] = 12;
+	[AstKind.NotEqualsExpression] = 12;
+	[AstKind.EqualsExpression] = 12;
+	[AstKind.BitwiseOrExpression] = 11;
+	[AstKind.BitwiseXorExpression] = 10;
+	[AstKind.BitwiseAndExpression] = 9;
+	[AstKind.LeftShiftExpression] = 8;
+	[AstKind.RightShiftExpression] = 8;
+	[AstKind.StrCatExpression] = 7;
+	[AstKind.AddExpression] = 6;
+	[AstKind.SubExpression] = 6;
+	[AstKind.MulExpression] = 5;
+	[AstKind.DivExpression] = 5;
+	[AstKind.FloorDivExpression] = 5;
+	[AstKind.ModExpression] = 5;
+	[AstKind.NotExpression] = 4;
+	[AstKind.LenExpression] = 4;
+	[AstKind.NegateExpression] = 4;
+	[AstKind.BitwiseNotExpression] = 4;
+	[AstKind.PowExpression] = 3;
 	[AstKind.IndexExpression] = 1;
 	[AstKind.AssignmentIndexing] = 1;
 	[AstKind.FunctionCallExpression] = 2;
 	[AstKind.PassSelfFunctionCallExpression] = 2;
 	[AstKind.VariableExpression] = 0;
 	[AstKind.AssignmentVariable] = 0;
-	[AstKind.FunctionLiteralExpression] = 3;
-	[AstKind.TableConstructorExpression] = 3;
+	[AstKind.FunctionLiteralExpression] = 2;
+	[AstKind.TableConstructorExpression] = 2;
 }
 
 Ast.AstKind = AstKind;
@@ -386,12 +400,13 @@ function Ast.LocalFunctionDeclaration(scope, id, args, body)
 	}
 end
 
-function Ast.LocalVariableDeclaration(scope, ids, expressions)
+function Ast.LocalVariableDeclaration(scope, ids, expressions, attributes)
 	return {
 		kind = AstKind.LocalVariableDeclaration,
 		scope = scope,
 		ids = ids,
 		expressions = expressions,
+		attributes = attributes or {},
 	}
 end
 
@@ -653,6 +668,117 @@ function Ast.ModExpression(lhs, rhs, simplify)
 	return {
 		kind = AstKind.ModExpression,
 		lhs = lhs,
+		rhs = rhs,
+		isConstant = false,
+	}
+end
+
+function Ast.FloorDivExpression(lhs, rhs, simplify)
+	if(simplify and rhs.isConstant and lhs.isConstant and rhs.value ~= 0) then
+		local success, val = pcall(function() return lhs.value // rhs.value end);
+		if success then
+			return Ast.ConstantNode(val);
+		end
+	end
+
+	return {
+		kind = AstKind.FloorDivExpression,
+		lhs = lhs,
+		rhs = rhs,
+		isConstant = false,
+	}
+end
+
+function Ast.BitwiseAndExpression(lhs, rhs, simplify)
+	if(simplify and rhs.isConstant and lhs.isConstant) then
+		local success, val = pcall(function() return lhs.value & rhs.value end);
+		if success then
+			return Ast.ConstantNode(val);
+		end
+	end
+
+	return {
+		kind = AstKind.BitwiseAndExpression,
+		lhs = lhs,
+		rhs = rhs,
+		isConstant = false,
+	}
+end
+
+function Ast.BitwiseOrExpression(lhs, rhs, simplify)
+	if(simplify and rhs.isConstant and lhs.isConstant) then
+		local success, val = pcall(function() return lhs.value | rhs.value end);
+		if success then
+			return Ast.ConstantNode(val);
+		end
+	end
+
+	return {
+		kind = AstKind.BitwiseOrExpression,
+		lhs = lhs,
+		rhs = rhs,
+		isConstant = false,
+	}
+end
+
+function Ast.BitwiseXorExpression(lhs, rhs, simplify)
+	if(simplify and rhs.isConstant and lhs.isConstant) then
+		local success, val = pcall(function() return lhs.value ~ rhs.value end);
+		if success then
+			return Ast.ConstantNode(val);
+		end
+	end
+
+	return {
+		kind = AstKind.BitwiseXorExpression,
+		lhs = lhs,
+		rhs = rhs,
+		isConstant = false,
+	}
+end
+
+function Ast.LeftShiftExpression(lhs, rhs, simplify)
+	if(simplify and rhs.isConstant and lhs.isConstant) then
+		local success, val = pcall(function() return lhs.value << rhs.value end);
+		if success then
+			return Ast.ConstantNode(val);
+		end
+	end
+
+	return {
+		kind = AstKind.LeftShiftExpression,
+		lhs = lhs,
+		rhs = rhs,
+		isConstant = false,
+	}
+end
+
+function Ast.RightShiftExpression(lhs, rhs, simplify)
+	if(simplify and rhs.isConstant and lhs.isConstant) then
+		local success, val = pcall(function() return lhs.value >> rhs.value end);
+		if success then
+			return Ast.ConstantNode(val);
+		end
+	end
+
+	return {
+		kind = AstKind.RightShiftExpression,
+		lhs = lhs,
+		rhs = rhs,
+		isConstant = false,
+	}
+end
+
+function Ast.BitwiseNotExpression(rhs, simplify)
+	if(simplify and rhs.isConstant) then
+		local success, val = pcall(function() return ~rhs.value end);
+		if success then
+			return Ast.ConstantNode(val);
+		end
+	end
+
+	return {
+		kind = AstKind.BitwiseNotExpression,
 		rhs = rhs,
 		isConstant = false,
 	}

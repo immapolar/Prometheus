@@ -10,6 +10,7 @@ local chararray = require("prometheus.util").chararray;
 Enums.LuaVersion = {
 	LuaU  = "LuaU" ,
 	Lua51 = "Lua51",
+	Lua54 = "Lua54",
 }
 
 Enums.Conventions = {
@@ -84,6 +85,51 @@ Enums.Conventions = {
 		BinaryNums          = {"b", "B"},
 		DecimalSeperators   = {"_"},
 		
+		EscapeSequences     = {
+			["a"] = "\a";
+			["b"] = "\b";
+			["f"] = "\f";
+			["n"] = "\n";
+			["r"] = "\r";
+			["t"] = "\t";
+			["v"] = "\v";
+			["\\"] = "\\";
+			["\""] = "\"";
+			["\'"] = "\'";
+		},
+		NumericalEscapes = true,
+		EscapeZIgnoreNextWhitespace = true,
+		HexEscapes = true,
+		UnicodeEscapes = true,
+	},
+	[Enums.LuaVersion.Lua54] = {
+		Keywords = {
+			"and",    "break",  "do",    "else",     "elseif", "goto",
+			"end",    "false",  "for",   "function", "if",
+			"in",     "local",  "nil",   "not",      "or",
+			"repeat", "return", "then",  "true",     "until",  "while"
+		},
+
+		SymbolChars = chararray("+-*/%^#=~<>(){}[];:,.|&"),
+		MaxSymbolLength = 3,
+		Symbols = {
+			"+",  "-",  "*",  "/",  "%",  "^",  "#",
+			"//", "<<", ">>", "&",  "|",  "~",
+			"==", "~=", "<=", ">=", "<",  ">",  "=",
+			"(",  ")",  "{",  "}",  "[",  "]",
+			";",  ":",  ",",  ".",  "..", "...",
+			"::",
+		},
+
+		IdentChars          = chararray("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789"),
+		NumberChars         = chararray("0123456789"),
+		HexNumberChars      = chararray("0123456789abcdefABCDEF"),
+		BinaryNumberChars   = {"0", "1"},
+		DecimalExponent     = {"e", "E"},
+		HexadecimalNums     = {"x", "X"},
+		BinaryNums          = {"b", "B"},
+		DecimalSeperators   = {"_"},
+
 		EscapeSequences     = {
 			["a"] = "\a";
 			["b"] = "\b";
