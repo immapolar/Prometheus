@@ -211,7 +211,14 @@ function Parser:statement(scope, currentLoop)
 		expect(self, TokenKind.Keyword, "end");
 		return Ast.DoStatement(body);
 	end
-	
+
+	-- FiveM/Lua54 defer ... end Statement
+	if(self.luaVersion == LuaVersion.Lua54 and consume(self, TokenKind.Keyword, "defer")) then
+		local body = self:block(scope, currentLoop);
+		expect(self, TokenKind.Keyword, "end");
+		return Ast.DeferStatement(body);
+	end
+
 	-- While Statement
 	if(consume(self, TokenKind.Keyword, "while")) then
 		local condition = self:expression(scope);
@@ -320,7 +327,16 @@ function Parser:statement(scope, currentLoop)
 		-- Local Variable Declaration
 		local ids, attributes = self:nameList(scope);
 		local expressions = {};
-		if(consume(self, TokenKind.Symbol, "=")) then
+
+		-- FiveM/Lua54 In Unpacking: local a, b, c in t => local a, b, c = t.a, t.b, t.c
+		if(self.luaVersion == LuaVersion.Lua54 and consume(self, TokenKind.Keyword, "in")) then
+			local tableExpr = self:expression(scope);
+			-- Generate t.a, t.b, t.c for each variable in the name list
+			for i, id in ipairs(ids) do
+				local varName = scope:getVariableName(id);
+				table.insert(expressions, Ast.IndexExpression(tableExpr, Ast.StringExpression(varName)));
+			end
+		elseif(consume(self, TokenKind.Symbol, "=")) then
 			expressions = self:exprList(scope);
 		end
 
@@ -440,6 +456,54 @@ function Parser:statement(scope, currentLoop)
 				if(consume(self, TokenKind.Symbol, "..=")) then
 					local rhs = self:expression(scope);
 					return Ast.CompoundConcatStatement(expr, rhs);
+				end
+			end
+
+			if(self.luaVersion == LuaVersion.Lua54) then
+				-- FiveM/CfxLua Compound Assignment Operators
+				if(consume(self, TokenKind.Symbol, "+=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundAddStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, "-=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundSubStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, "*=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundMulStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, "/=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundDivStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, "<<=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundLeftShiftStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, ">>=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundRightShiftStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, "&=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundBitwiseAndStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, "|=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundBitwiseOrStatement(expr, rhs);
+				end
+
+				if(consume(self, TokenKind.Symbol, "^=")) then
+					local rhs = self:expression(scope);
+					return Ast.CompoundBitwiseXorStatement(expr, rhs);
 				end
 			end
 
@@ -918,22 +982,44 @@ end
 function Parser:expressionIndex(scope, base)
 	base = base or self:expressionLiteral(scope);
 	
-	-- Parse Indexing Expressions
-	while(consume(self, TokenKind.Symbol, "[")) do
-		local expr = self:expression(scope);
-		expect(self, TokenKind.Symbol, "]");
-		base = Ast.IndexExpression(base, expr);
-	end
-	
-	-- Parse Indexing Expressions
-	while consume(self, TokenKind.Symbol, ".") do
-		local ident = expect(self, TokenKind.Ident);
-		base = Ast.IndexExpression(base, Ast.StringExpression(ident.value));
-		
-		while(consume(self, TokenKind.Symbol, "[")) do
+	-- Parse Indexing Expressions (unified loop for . and ?.)
+	local parsing = true;
+	while parsing do
+		if(consume(self, TokenKind.Symbol, "[")) then
 			local expr = self:expression(scope);
 			expect(self, TokenKind.Symbol, "]");
 			base = Ast.IndexExpression(base, expr);
+
+		elseif consume(self, TokenKind.Symbol, ".") then
+			local ident = expect(self, TokenKind.Ident);
+			base = Ast.IndexExpression(base, Ast.StringExpression(ident.value));
+
+		-- FiveM/Lua54 Safe Navigation Operator
+		elseif(self.luaVersion == LuaVersion.Lua54 and consume(self, TokenKind.Symbol, "?.")) then
+			-- Safe member access: x?.name
+			if is(self, TokenKind.Ident) then
+				local ident = expect(self, TokenKind.Ident);
+				base = Ast.SafeMemberExpression(base, ident.value);
+
+			-- Safe indexing: x?.[expr]
+			elseif consume(self, TokenKind.Symbol, "[") then
+				local expr = self:expression(scope);
+				expect(self, TokenKind.Symbol, "]");
+				base = Ast.SafeIndexExpression(base, expr);
+
+			-- Safe function call: x?.()
+			elseif consume(self, TokenKind.Symbol, "(") then
+				local args = {};
+				if not is(self, TokenKind.Symbol, ")") then
+					args = self:exprList(scope);
+				end
+				expect(self, TokenKind.Symbol, ")");
+				base = Ast.SafeFunctionCallExpression(base, args);
+			else
+				logger:error(generateError(self, "Expected identifier, '[', or '(' after '?.'"));
+			end
+		else
+			parsing = false;
 		end
 	end
 
@@ -1038,7 +1124,13 @@ function Parser:tableConstructor(scope)
 	expect(self, TokenKind.Symbol, "{");
 	
 	while (not consume(self, TokenKind.Symbol, "}")) do
-		if(consume(self, TokenKind.Symbol, "[")) then
+		-- FiveM/Lua54 Set Constructor: { .a, .b } => { a = true, b = true }
+		if(self.luaVersion == LuaVersion.Lua54 and consume(self, TokenKind.Symbol, ".")) then
+			local ident = expect(self, TokenKind.Ident);
+			local key = Ast.StringExpression(ident.value);
+			local value = Ast.BooleanExpression(true);
+			table.insert(entries, Ast.KeyedTableEntry(key, value));
+		elseif(consume(self, TokenKind.Symbol, "[")) then
 			local key = self:expression(scope);
 			expect(self, TokenKind.Symbol, "]");
 			expect(self, TokenKind.Symbol, "=");

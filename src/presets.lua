@@ -293,5 +293,121 @@ return {
                 };
             },
         }
+    };
+    ["FiveM"] = {
+        -- FiveM uses Lua 5.4 with CfxLua extensions
+        LuaVersion = "Lua54",
+        VarNamePrefix = "",
+        NameGenerator = "MangledShuffled",
+        PrettyPrint = false,
+        Seed = os.time(),
+        RandomizeSettings = true, -- Enable polymorphic per-file setting variation
+        -- Optimized for FiveM scripts with all CfxLua features supported
+        Steps = {
+            {
+                Name = "EncryptStrings";
+                Settings = {
+                    UseStrong = false;
+                    SimulateByteString = true;
+                    MinLength = 3;
+                };
+            },
+            {
+                Name = "ConstantArray";
+                Settings = {
+                    Treshold = 0.5;
+                    StringsOnly = true;
+                    Shuffle = true;
+                    Rotate = false;
+                    LocalWrapperTreshold = 0.5;
+                    MaxArraySize = 150;
+                };
+            },
+            {
+                Name = "NumbersToExpressions";
+                Settings = {
+                    Treshold = 1;
+                    MaxDepth = 2;
+                    UseBitwise = true;  -- Leverage Lua 5.4 bitwise operators
+                };
+            },
+            {
+                Name = "SplitStrings";
+                Settings = {
+                    Treshold = 0.5;
+                };
+            },
+            {
+                Name = "WrapInFunction";
+                Settings = {
+                    Iterations = 1;
+                };
+            },
+        }
+    };
+    ["FiveM_Strong"] = {
+        -- Stronger obfuscation for sensitive FiveM scripts
+        LuaVersion = "Lua54",
+        VarNamePrefix = "",
+        NameGenerator = "Il",  -- Confusing I/l names
+        PrettyPrint = false,
+        Seed = os.time(),
+        RandomizeSettings = true, -- Enable polymorphic per-file setting variation
+        Steps = {
+            {
+                Name = "EncryptStrings";
+                Settings = {
+                    UseStrong = true;  -- Stronger encryption
+                    SimulateByteString = true;
+                    MinLength = 2;
+                };
+            },
+            {
+                Name = "Vmify";
+                Settings = {
+                    MaximumVMs = 1;
+                    VirtualizeAll = false;
+                    ChunkSize = 4;
+                };
+            },
+            {
+                Name = "ConstantArray";
+                Settings = {
+                    Treshold = 0.8;
+                    StringsOnly = false;  -- Include numbers
+                    Shuffle = true;
+                    Rotate = true;
+                    LocalWrapperTreshold = 0.8;
+                    MaxArraySize = 100;
+                };
+            },
+            {
+                Name = "NumbersToExpressions";
+                Settings = {
+                    Treshold = 0.8;
+                    MaxDepth = 3;
+                    UseBitwise = true;
+                };
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    Treshold = 0.6;
+                };
+            },
+            {
+                Name = "SplitStrings";
+                Settings = {
+                    Treshold = 0.7;
+                };
+            },
+            {
+                Name = "WrapInFunction";
+                Settings = {
+                    Iterations = 2;
+                    LocalsCount = 3;
+                };
+            },
+        }
     }
 }

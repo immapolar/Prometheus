@@ -271,6 +271,32 @@ local function readonly(obj)
 	return r;
 end
 
+-- Jenkins one-at-a-time hash for FiveM backtick literals
+-- Implements: https://en.wikipedia.org/wiki/Jenkins_hash_function
+local function jenkinsHash(key)
+	local hash = 0;
+	local len = #key;
+
+	-- Convert to lowercase and compute hash
+	for i = 1, len do
+		local byte = string.byte(string.lower(string.sub(key, i, i)));
+		hash = bit32.band(hash + byte, 0xFFFFFFFF);
+		hash = bit32.band(hash + bit32.lshift(hash, 10), 0xFFFFFFFF);
+		hash = bit32.bxor(hash, bit32.rshift(hash, 6));
+	end
+
+	hash = bit32.band(hash + bit32.lshift(hash, 3), 0xFFFFFFFF);
+	hash = bit32.bxor(hash, bit32.rshift(hash, 11));
+	hash = bit32.band(hash + bit32.lshift(hash, 15), 0xFFFFFFFF);
+
+	-- Convert to signed 32-bit integer
+	if hash >= 0x80000000 then
+		hash = hash - 0x100000000;
+	end
+
+	return hash;
+end
+
 return {
 	lookupify = lookupify,
 	unlookupify = unlookupify,
@@ -294,4 +320,5 @@ return {
 	toBits = toBits,
 	bytesToString = bytesToString,
 	readonly = readonly,
+	jenkinsHash = jenkinsHash,
 }

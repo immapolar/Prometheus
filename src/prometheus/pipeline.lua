@@ -12,6 +12,7 @@ local util = require("prometheus.util");
 local Parser = require("prometheus.parser");
 local Unparser = require("prometheus.unparser");
 local logger = require("logger");
+local Entropy = require("prometheus.entropy");
 
 local NameGenerators = require("prometheus.namegenerators");
 
@@ -39,6 +40,7 @@ local Pipeline = {
 		PrettyPrint = false; -- Note that Pretty Print is currently not producing Pretty results
 		Seed = 0; -- The Seed. 0 or below uses the current time as a seed
 		VarNamePrefix = ""; -- The Prefix that every variable will start with
+		RandomizeSettings = false; -- Enable per-file setting randomization for polymorphic obfuscation (Phase 10.2)
 	}
 }
 
@@ -54,12 +56,14 @@ function Pipeline:new(settings)
 	local prettyPrint = settings.PrettyPrint or Pipeline.DefaultSettings.PrettyPrint;
 	local prefix = settings.VarNamePrefix or Pipeline.DefaultSettings.VarNamePrefix;
 	local seed = settings.Seed or 0;
-	
+	local randomizeSettings = settings.RandomizeSettings or Pipeline.DefaultSettings.RandomizeSettings;
+
 	local pipeline = {
 		LuaVersion = luaVersion;
 		PrettyPrint = prettyPrint;
 		VarNamePrefix = prefix;
 		Seed = seed;
+		RandomizeSettings = randomizeSettings;
 		parser = Parser:new({
 			LuaVersion = luaVersion;
 		});
@@ -79,6 +83,92 @@ function Pipeline:new(settings)
 	return pipeline;
 end
 
+-- Randomize Step Settings for Polymorphic Obfuscation
+-- Phase 10, Objective 10.2: Per-File Step Configuration Randomization
+-- This function randomizes numeric and boolean settings within safe ranges
+-- to ensure unique obfuscation patterns per file
+function Pipeline:randomizeStepSettings()
+	if not self.RandomizeSettings then
+		return;
+	end
+
+	logger:info("Randomizing step settings for polymorphic obfuscation ...");
+
+	-- Safe randomization ranges for each step and setting
+	-- Ranges are carefully chosen to maintain functionality while providing variation
+	-- Step names MUST match exactly as defined in step.Name property
+	local randomizationRules = {
+		["Constant Array"] = {
+			Treshold = {min = 0.5, max = 1.0},           -- Probability of constant extraction
+			LocalWrapperTreshold = {min = 0.3, max = 1.0}, -- Probability of local wrapper usage
+			Shuffle = {boolean = true},                    -- Random boolean
+			Rotate = {boolean = true},                     -- Random boolean
+		},
+		["Numbers To Expressions"] = {
+			Treshold = {min = 0.6, max = 1.0},          -- Probability of number transformation
+			InternalTreshold = {min = 0.1, max = 0.4},  -- Expression tree depth control
+		},
+		["Wrap in Function"] = {
+			Iterations = {min = 1, max = 3, integer = true}, -- Function wrapping layers
+		},
+		["Proxify Locals"] = {
+			Treshold = {min = 0.4, max = 0.8},          -- Probability of variable proxification
+		},
+		["Split Strings"] = {
+			Treshold = {min = 0.4, max = 0.8},          -- Probability of string splitting
+			MinLength = {min = 3, max = 8, integer = true},  -- Minimum chunk size
+			MaxLength = {min = 5, max = 15, integer = true}, -- Maximum chunk size
+		},
+	};
+
+	local randomizedCount = 0;
+
+	for i, step in ipairs(self.steps) do
+		local stepName = step.Name;
+		local rules = randomizationRules[stepName];
+
+		if rules then
+			for settingName, rule in pairs(rules) do
+				if step[settingName] ~= nil then
+					local originalValue = step[settingName];
+					local newValue;
+
+					if rule.boolean then
+						-- Random boolean
+						newValue = math.random() < 0.5;
+					elseif rule.min and rule.max then
+						if rule.integer then
+							-- Random integer in range
+							newValue = math.random(rule.min, rule.max);
+						else
+							-- Random float in range
+							newValue = rule.min + math.random() * (rule.max - rule.min);
+						end
+					end
+
+					if newValue ~= nil and newValue ~= originalValue then
+						step[settingName] = newValue;
+						randomizedCount = randomizedCount + 1;
+
+						-- Log randomization for transparency
+						if type(newValue) == "number" and not rule.integer then
+							logger:info(string.format("  %s.%s: %.2f -> %.2f", stepName, settingName, originalValue, newValue));
+						else
+							logger:info(string.format("  %s.%s: %s -> %s", stepName, settingName, tostring(originalValue), tostring(newValue)));
+						end
+					end
+				end
+			end
+		end
+	end
+
+	if randomizedCount > 0 then
+		logger:info(string.format("Randomized %d settings across %d steps", randomizedCount, #self.steps));
+	else
+		logger:info("No settings randomized (all steps use default ranges)");
+	end
+end
+
 function Pipeline:fromConfig(config)
 	config = config or {};
 	local pipeline = Pipeline:new({
@@ -86,6 +176,7 @@ function Pipeline:fromConfig(config)
 		PrettyPrint   = config.PrettyPrint or false;
 		VarNamePrefix = config.VarNamePrefix or "";
 		Seed          = config.Seed or 0;
+		RandomizeSettings = config.RandomizeSettings or false;
 	});
 
 	pipeline:setNameGenerator(config.NameGenerator or "MangledShuffled")
@@ -164,13 +255,17 @@ function Pipeline:apply(code, filename)
 	local startTime = gettime();
 	filename = filename or "Anonymus Script";
 	logger:info(string.format("Applying Obfuscation Pipeline to %s ...", filename));
-	-- Seed the Random Generator
-	if(self.Seed > 0) then
-		math.randomseed(self.Seed);
-	else
-		math.randomseed(os.time())
-	end
-	
+
+	-- Seed the Random Generator using Entropy-Based Seed Generation
+	-- This provides polymorphic obfuscation: same file produces different output each time
+	-- while maintaining reproducibility when user specifies a seed > 0
+	local entropySeed = Entropy.generateSeed(code, filename, self.Seed);
+	math.randomseed(entropySeed);
+
+	-- Apply setting randomization after entropy seeding
+	-- This ensures each file gets unique randomization based on its entropy
+	self:randomizeStepSettings();
+
 	logger:info("Parsing ...");
 	local parserStartTime = gettime();
 

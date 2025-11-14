@@ -107,15 +107,21 @@ Enums.Conventions = {
 			"and",    "break",  "do",    "else",     "elseif", "goto",
 			"end",    "false",  "for",   "function", "if",
 			"in",     "local",  "nil",   "not",      "or",
-			"repeat", "return", "then",  "true",     "until",  "while"
+			"repeat", "return", "then",  "true",     "until",  "while",
+			-- FiveM/CfxLua extension
+			"defer"
 		},
 
-		SymbolChars = chararray("+-*/%^#=~<>(){}[];:,.|&"),
+		SymbolChars = chararray("+-*/%^#=~<>(){}[];:,.?|&"),
 		MaxSymbolLength = 3,
 		Symbols = {
 			"+",  "-",  "*",  "/",  "%",  "^",  "#",
 			"//", "<<", ">>", "&",  "|",  "~",
 			"==", "~=", "<=", ">=", "<",  ">",  "=",
+			-- FiveM/CfxLua compound assignment operators
+			"+=", "-=", "*=", "/=", "<<=", ">>=", "&=", "|=", "^=",
+			-- FiveM/CfxLua safe navigation operator
+			"?.", "?",
 			"(",  ")",  "{",  "}",  "[",  "]",
 			";",  ":",  ",",  ".",  "..", "...",
 			"::",

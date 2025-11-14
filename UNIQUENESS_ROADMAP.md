@@ -1,0 +1,948 @@
+# Prometheus Uniqueness Roadmap
+## Achieving 65%+ Per-File Obfuscation Uniqueness
+
+**Objective**: Transform Prometheus from a pattern-based obfuscator into a polymorphic engine that produces 65%+ unique output for every file, following Luraph's methodology of breaking automated de-obfuscation tools.
+
+**Philosophy**: Force attackers to either build file-specific de-obfuscation tools or resort to manual analysis (difficult, complex, time-consuming, and effort-heavy).
+
+---
+
+## Implementation Status
+
+### Completed Objectives
+
+✅ **Phase 1, Objective 1.1: Entropy-Based Random Engine** - File-content-based entropy seeding implemented and verified
+
+✅ **Phase 10, Objective 10.2: Per-File Step Configuration Randomization** - Setting randomization with safe ranges implemented and verified
+
+### In Progress
+
+(None)
+
+### Pending
+
+All remaining objectives per roadmap
+
+---
+
+## Current State Analysis
+
+### Pattern Vulnerabilities Identified
+
+**Critical Issues (High Impact on Uniqueness)**:
+1. **Deterministic Seed-Based Randomization** - Same seed produces identical output
+2. **Fixed Encryption Parameters** - EncryptStrings uses constant `param_mul_45`, `param_mul_8`, `param_add_45`, `secret_key_8`
+3. **Predictable Name Generation** - MangledShuffled uses fixed character arrays
+4. **Static Wrapper Patterns** - ConstantArray wrappers follow identical structure
+5. **Linear Control Flow Preservation** - Original control flow remains intact
+6. **Monomorphic Expression Trees** - NumbersToExpressions generates similar patterns
+
+**Moderate Issues (Medium Impact)**:
+7. **Consistent Metatable Operations** - ProxifyLocals uses same metamethod selection logic
+8. **Fixed String Split Patterns** - SplitStrings has predictable concatenation
+9. **Constant VM Instruction Set** - Vmify generates same bytecode format
+10. **Static Unparser Output** - Code generation follows rigid templates
+
+**Low Impact Issues**:
+11. **Predictable Watermark Locations** - AntiTamper insertion points are static
+12. **Fixed Base64 Character Shuffle** - ConstantArray encoding is consistent per seed
+
+---
+
+## Architecture Transformation Goals
+
+### Core Principle: Polymorphic Per-File Randomization
+
+Each obfuscated file must have:
+- **Unique encryption algorithms** (not just different keys)
+- **Unique code generation templates**
+- **Unique control flow transformations**
+- **Unique VM instruction sets** (when Vmify is used)
+- **Unique constant extraction strategies**
+- **Unique variable naming schemes**
+
+---
+
+## Implementation Roadmap
+
+### **Phase 1: Polymorphic Foundation**
+
+#### **Objective 1.1: Entropy-Based Random Engine** ✅ **COMPLETED**
+**Problem**: Deterministic `math.random()` with seeds produces identical outputs.
+
+**Solution**:
+- Create `src/prometheus/entropy.lua` module
+- Implement multiple entropy sources:
+  - High-resolution timestamp (microseconds)
+  - File content hash (SHA-256 of source code)
+  - Process ID and memory address entropy
+  - System-specific entropy (CPU, GPU info)
+- Combine entropy sources with cryptographic hash mixing
+- Provide per-step isolated RNG state (each step gets independent entropy)
+
+**Files to Modify**:
+- `src/prometheus/pipeline.lua`: Replace `math.randomseed()` with entropy engine
+- All step files: Accept entropy context parameter
+
+**Success Metric**: Same file obfuscated twice produces different outputs even with identical configuration.
+
+---
+
+#### **Objective 1.2: Algorithm Randomization Framework**
+**Problem**: Steps use fixed algorithms (e.g., EncryptStrings always uses same PRNG formula).
+
+**Solution**:
+- Create `src/prometheus/polymorphism.lua` framework
+- Define algorithm variant system:
+  - Each step declares multiple algorithm variants
+  - Pipeline randomly selects variant per file
+  - Variants are functionally equivalent but structurally different
+- Implement variant registry and selection logic
+
+**Files to Create**:
+- `src/prometheus/polymorphism.lua`
+- `src/prometheus/variants/` directory
+
+**Success Metric**: Each step can execute using at least 3 different algorithm variants.
+
+---
+
+### **Phase 2: String Encryption Polymorphism**
+
+#### **Objective 2.1: Multiple Encryption Algorithms**
+**Problem**: EncryptStrings uses single LCG-based PRNG algorithm.
+
+**Solution**:
+Implement 5 encryption algorithm variants:
+
+1. **LCG Variant (Current)** - Keep existing for compatibility
+2. **XORShift Variant** - XORShift128+ with dynamic shift parameters
+3. **ChaCha20-based Variant** - Lightweight stream cipher
+4. **Blum Blum Shub Variant** - Cryptographically secure PRNG
+5. **Mixed Congruential Variant** - Multiple LCGs combined
+
+**Implementation**:
+- `src/prometheus/steps/EncryptStrings/variants/` directory
+- Each variant in separate file
+- Random variant selection per file
+- Random parameter generation per variant
+
+**Files to Modify**:
+- `src/prometheus/steps/EncryptStrings.lua`
+
+**Success Metric**: Encrypted strings from 10 different files show 0% pattern correlation.
+
+---
+
+#### **Objective 2.2: Dynamic Decryption Code Generation**
+**Problem**: Decryption stub code is identical across all obfuscated files.
+
+**Solution**:
+- Generate decryption code from randomized templates
+- Randomize variable names uniquely per file (not using global name generator)
+- Randomize code structure:
+  - Random statement order (shuffle independent operations)
+  - Random loop constructs (for/while/repeat)
+  - Random intermediate calculations
+- Randomize charmap generation (different shuffle algorithms)
+
+**Implementation**:
+- `src/prometheus/steps/EncryptStrings.lua`: Refactor `genCode()` method
+- Create template engine with polymorphic AST generation
+
+**Success Metric**: Decryption stubs from different files have <10% code similarity.
+
+---
+
+### **Phase 3: Constant Array Polymorphism**
+
+#### **Objective 3.1: Variable Array Indexing Strategies**
+**Problem**: ConstantArray always uses direct indexing with offset wrappers.
+
+**Solution**:
+Implement 6 indexing strategies (randomly selected per file):
+
+1. **Direct Offset** (Current) - `ARR[index + offset]`
+2. **Mathematical Transform** - `ARR[index * prime % arrayLen + 1]`
+3. **Bit Manipulation** - `ARR[(index ~ xorKey) & mask]`
+4. **Table Indirection** - `ARR[INDEX_MAP[index]]` with shuffled mapping
+5. **Function Chain** - Multiple wrapper functions with different transforms
+6. **Hybrid Strategy** - Combination of 2-3 methods per array
+
+**Implementation**:
+- `src/prometheus/steps/ConstantArray/indexing_strategies/` directory
+- Random strategy selection
+- Per-constant randomization (different constants use different strategies)
+
+**Files to Modify**:
+- `src/prometheus/steps/ConstantArray.lua`
+
+**Success Metric**: Constant access patterns unrecognizable between files.
+
+---
+
+#### **Objective 3.2: Dynamic Encoding Schemes**
+**Problem**: Base64 encoding is predictable (same alphabet shuffle per seed).
+
+**Solution**:
+Implement 5 encoding variants:
+
+1. **Custom Base64** - Random alphabet per file
+2. **Custom Base85** - Higher density encoding
+3. **Hexadecimal with Shuffle** - Shuffled hex digits
+4. **Run-Length Encoding** - With random escape sequences
+5. **Hybrid Encoding** - Different encoding per string
+
+**Implementation**:
+- `src/prometheus/steps/ConstantArray/encodings/` directory
+- Random encoding selection per file or per string
+- Dynamic decoder generation
+
+**Files to Modify**:
+- `src/prometheus/steps/ConstantArray.lua`
+
+**Success Metric**: String encoding patterns show 0% similarity across files.
+
+---
+
+### **Phase 4: Control Flow Transformation**
+
+#### **Objective 4.1: Opaque Predicates**
+**Problem**: Control flow remains linear and transparent.
+
+**Solution**:
+- Insert opaque predicates (always true/false conditions that appear dynamic)
+- Generate mathematically complex predicates:
+  - `(x^2 >= 0)` - Always true
+  - `(x^2 + y^2 >= 2*x*y)` - Always true
+  - `(hash(const) % 2 == precomputed)` - Deterministic but appears random
+- Randomize predicate types and complexity per file
+- Insert fake conditional branches that never execute
+
+**Implementation**:
+- Create `src/prometheus/steps/ControlFlowFlatten.lua` step
+- Implement opaque predicate generator
+- Random predicate insertion at function entry/exit and loops
+
+**Files to Create**:
+- `src/prometheus/steps/ControlFlowFlatten.lua`
+
+**Success Metric**: Control flow graphs differ significantly between files with same source.
+
+---
+
+#### **Objective 4.2: Control Flow Dispatcher**
+**Problem**: Statement execution order is linear.
+
+**Solution**:
+- Implement dispatcher-based control flow:
+  - Convert sequential blocks to state machine
+  - Random state number assignment
+  - Dispatcher loop selects next state
+- Randomize dispatcher implementation:
+  - Table-based dispatch vs if-else chain vs computed goto (if supported)
+  - Random state transition calculations
+
+**Implementation**:
+- Extend `src/prometheus/steps/ControlFlowFlatten.lua`
+- Add dispatcher variant system
+
+**Success Metric**: Execution flow unrecognizable; automated CFG reconstruction fails.
+
+---
+
+### **Phase 5: Expression Polymorphism**
+
+#### **Objective 5.1: Deep Expression Diversification**
+**Problem**: NumbersToExpressions uses only 2 generators (add/sub).
+
+**Solution**:
+Implement 15 expression generators:
+
+1. **Addition Chain** - Multiple additions
+2. **Subtraction Chain** - Multiple subtractions
+3. **Multiplication + Division** - `(x * a) / a`
+4. **Modulo Patterns** - `(x + k*m) % m` where `k` is random
+5. **Bitwise XOR** - `x ~ mask ~ mask`
+6. **Bitwise Shifts** - `(x << a) >> a` (for Lua 5.4)
+7. **Power Operations** - `x = a^b` where `a^b == x`
+8. **String Length** - `#("a"):rep(x)` for small integers
+9. **Table Construction** - `#{1,2,3,...,x}`
+10. **Math Functions** - `math.floor(x.123)` where `.123` varies
+11. **Trigonometric** - `math.floor(math.sin(a)*b + c)`
+12. **Nested Ternary** - Using `and`/`or` chains
+13. **Constant Folding Resistant** - Expressions that can't be statically evaluated
+14. **Mixed Expressions** - Combination of 3-5 methods
+15. **Polynomial Expressions** - `a*x^2 + b*x + c` where result equals target
+
+**Implementation**:
+- `src/prometheus/steps/NumbersToExpressions/generators/` directory
+- Random generator selection with configurable weights
+- Per-number randomization (each number uses different generator)
+
+**Files to Modify**:
+- `src/prometheus/steps/NumbersToExpressions.lua`
+
+**Success Metric**: Same number in different files has completely different expressions.
+
+---
+
+#### **Objective 5.2: Polymorphic Expression Trees**
+**Problem**: Expression AST structure is similar across files.
+
+**Solution**:
+- Randomize expression tree depth (2-8 levels)
+- Randomize expression tree balance (left-heavy, right-heavy, balanced)
+- Insert no-op operations randomly (`x + 0`, `x * 1`, `x - 0`)
+- Randomize parenthesization patterns
+- Generate equivalent expressions with different operator precedence usage
+
+**Implementation**:
+- Extend NumbersToExpressions step
+- Add AST structure randomization
+
+**Success Metric**: Expression trees for same value show <5% structural similarity.
+
+---
+
+### **Phase 6: Variable Name Polymorphism**
+
+#### **Objective 6.1: Per-File Name Generation Algorithms**
+**Problem**: Name generators use fixed character sets and patterns.
+
+**Solution**:
+Implement 8 name generator variants (randomly selected per file):
+
+1. **Mangled Shuffled** (Current)
+2. **Unicode Confusables** - Visually similar Unicode chars (Α vs A)
+3. **Homoglyph Generator** - Mixed scripts (Cyrillic + Latin)
+4. **Emoji-Based** - Valid Lua identifiers using emoji (Lua 5.4)
+5. **Random Dictionary Words** - Pronounceable but meaningless
+6. **Fibonacci Encoding** - Names based on Fibonacci sequence
+7. **Prime-Based** - Names generated from prime factorization
+8. **Hash-Derived** - Names from hashing scope + variable index
+
+**Implementation**:
+- `src/prometheus/namegenerators/` directory - add new generators
+- Random generator selection per file
+- Per-scope randomization (different scopes use different generators)
+
+**Files to Create**:
+- `src/prometheus/namegenerators/unicode_confusables.lua`
+- `src/prometheus/namegenerators/homoglyph.lua`
+- `src/prometheus/namegenerators/emoji.lua`
+- `src/prometheus/namegenerators/dictionary.lua`
+- `src/prometheus/namegenerators/fibonacci.lua`
+- `src/prometheus/namegenerators/prime.lua`
+- `src/prometheus/namegenerators/hash_derived.lua`
+
+**Success Metric**: Variable names from different files show no pattern correlation.
+
+---
+
+#### **Objective 6.2: Dynamic Name Length Distribution**
+**Problem**: Name lengths follow predictable patterns.
+
+**Solution**:
+- Randomize name length distribution per file:
+  - Short names (1-3 chars)
+  - Medium names (4-8 chars)
+  - Long names (9-20 chars)
+  - Very long names (21-50 chars)
+- Random distribution weights per file
+- Ensure varied length within single file
+
+**Implementation**:
+- Modify all name generators to accept length parameters
+- Random length distribution selection in pipeline
+
+**Files to Modify**:
+- All files in `src/prometheus/namegenerators/`
+- `src/prometheus/pipeline.lua`
+
+**Success Metric**: Name length histograms differ significantly between files.
+
+---
+
+### **Phase 7: Metatable Polymorphism**
+
+#### **Objective 7.1: Dynamic Metamethod Selection**
+**Problem**: ProxifyLocals uses predictable metamethods (`__add`, `__sub`, etc.).
+
+**Solution**:
+- Randomize metamethod selection per variable per file
+- Implement all 13 Lua metamethods as potential wrappers:
+  - Arithmetic: `__add`, `__sub`, `__mul`, `__div`, `__mod`, `__pow`, `__unm`
+  - Bitwise (Lua 5.4): `__band`, `__bor`, `__bxor`, `__bnot`, `__shl`, `__shr`
+  - Relational: `__eq`, `__lt`, `__le`
+  - Concatenation: `__concat`
+  - Indexing: `__index`, `__newindex`
+  - Call: `__call`
+- Random metamethod combination (use different methods for get/set/index)
+- Per-variable randomization (each variable uses different metamethods)
+
+**Implementation**:
+- Modify `src/prometheus/steps/ProxifyLocals.lua`
+- Expand metamethod selection logic
+- Add Lua 5.4 bitwise metamethods
+
+**Files to Modify**:
+- `src/prometheus/steps/ProxifyLocals.lua`
+
+**Success Metric**: Metatable access patterns unrecognizable between files.
+
+---
+
+#### **Objective 7.2: Nested Proxy Chains**
+**Problem**: Single-level proxies are easily identifiable.
+
+**Solution**:
+- Implement multi-level proxy wrapping:
+  - Level 1: Value wrapped in metatable
+  - Level 2: Level 1 wrapped in another metatable with different methods
+  - Level 3+: Further nesting (randomly 1-4 levels)
+- Each level uses different metamethods
+- Random nesting depth per variable
+
+**Implementation**:
+- Extend ProxifyLocals step
+- Implement recursive proxy generation
+
+**Success Metric**: Proxy detection requires recursive metatable traversal analysis.
+
+---
+
+### **Phase 8: VM Polymorphism**
+
+#### **Objective 8.1: Per-File Instruction Set Randomization**
+**Problem**: Vmify generates identical VM bytecode format across files.
+
+**Solution**:
+- Randomize VM instruction opcodes per file:
+  - Instruction ID shuffle (LOAD=0x01 in file A, LOAD=0x3F in file B)
+  - Random opcode encoding (8-bit, 16-bit, variable-length)
+- Randomize instruction encoding:
+  - Operand order shuffle
+  - Operand bit packing schemes
+  - Variable-length operands
+- Random register count (8, 16, 32, or 64 registers)
+
+**Implementation**:
+- `src/prometheus/compiler/compiler.lua`: Major refactoring
+- Create instruction set generator
+- Parameterize all hardcoded instruction values
+
+**Files to Modify**:
+- `src/prometheus/compiler/compiler.lua`
+
+**Success Metric**: VM instruction sets from different files are completely incompatible.
+
+---
+
+#### **Objective 8.2: Polymorphic VM Runtime**
+**Problem**: VM interpreter code is identical across files.
+
+**Solution**:
+- Generate VM runtime from templates with randomization:
+  - Random dispatch method (switch vs table vs computed goto)
+  - Random stack implementation (array vs linked list vs hybrid)
+  - Random instruction decoding logic
+  - Random register storage (flat array vs nested tables)
+- Randomize VM variable names independently
+- Randomize VM helper function implementations
+
+**Implementation**:
+- Refactor compiler to use template-based VM generation
+- Create polymorphic template system
+
+**Success Metric**: VM runtimes from different files share <15% code similarity.
+
+---
+
+### **Phase 9: Code Structure Randomization**
+
+#### **Objective 9.1: Statement Reordering**
+**Problem**: Independent statements appear in source order.
+
+**Solution**:
+- Detect independent statements (no data dependencies)
+- Randomly reorder independent statements
+- Insert random no-op statements between reordered blocks
+- Randomize declaration vs assignment order (split `local x = 1` into `local x; x = 1`)
+
+**Implementation**:
+- Create `src/prometheus/steps/StatementShuffle.lua` step
+- Implement dependency analysis
+- Safe reordering algorithm
+
+**Files to Create**:
+- `src/prometheus/steps/StatementShuffle.lua`
+
+**Success Metric**: Statement order differs significantly from source in unpredictable ways.
+
+---
+
+#### **Objective 9.2: Dead Code Injection**
+**Problem**: All code in output is meaningful, making analysis easier.
+
+**Solution**:
+- Inject random dead code blocks:
+  - Unreachable code after `return`
+  - Conditional blocks with opaque false predicates
+  - Unused local variables and functions
+  - Complex but meaningless calculations
+- Randomize dead code quantity (5-20% of output)
+- Randomize dead code complexity (simple vs complex)
+- Make dead code contextually believable (looks real)
+
+**Implementation**:
+- Create `src/prometheus/steps/DeadCodeInjection.lua` step
+- Implement realistic dead code generator
+- Random injection points
+
+**Files to Create**:
+- `src/prometheus/steps/DeadCodeInjection.lua`
+
+**Success Metric**: Analysts cannot easily distinguish dead code from live code.
+
+---
+
+### **Phase 10: Preset Randomization**
+
+#### **Objective 10.1: Dynamic Step Ordering**
+**Problem**: Obfuscation steps execute in fixed order per preset.
+
+**Solution**:
+- Randomize step execution order per file (where dependencies allow):
+  - Define step dependency graph
+  - Generate random topological sort
+  - Different files get different step orders
+- Randomize step selection (enable/disable steps randomly within constraints)
+- Random step setting variations
+
+**Implementation**:
+- `src/prometheus/pipeline.lua`: Add step dependency system
+- Random topological ordering
+- Step selection randomization
+
+**Files to Modify**:
+- `src/prometheus/pipeline.lua`
+- `src/presets.lua`
+
+**Success Metric**: Step execution order varies across files with same preset.
+
+---
+
+#### **Objective 10.2: Per-File Step Configuration** ✅ **COMPLETED**
+**Problem**: Step settings are consistent across files with same preset.
+
+**Solution**:
+- Randomize step settings within safe ranges per file:
+  - ConstantArray.Treshold: Random 0.5-1.0
+  - NumbersToExpressions.MaxDepth: Random 2-5
+  - WrapInFunction.Iterations: Random 1-3
+  - ProxifyLocals.Treshold: Random 0.4-0.8
+- Document safe randomization ranges for each setting
+- Ensure randomized settings don't break obfuscation
+
+**Implementation**:
+- Modify each step to support setting randomization
+- Add randomization metadata to SettingsDescriptor
+- Pipeline auto-randomizes settings
+
+**Files to Modify**:
+- All step files
+- `src/prometheus/pipeline.lua`
+
+**Success Metric**: Same preset produces varied configurations across files.
+
+---
+
+### **Phase 11: Anti-Pattern-Analysis Features**
+
+#### **Objective 11.1: Signature Poisoning**
+**Problem**: Analysts can fingerprint Prometheus output by looking for specific patterns.
+
+**Solution**:
+- Inject misleading patterns from other obfuscators:
+  - Luraph-like patterns
+  - IronBrew-like patterns
+  - PSU Obfuscator-like patterns
+- Random pattern injection (different files get different fake signatures)
+- Make fake patterns convincing but non-functional
+
+**Implementation**:
+- Create `src/prometheus/steps/SignaturePoisoning.lua` step
+- Database of obfuscator signatures
+- Random signature injection
+
+**Files to Create**:
+- `src/prometheus/steps/SignaturePoisoning.lua`
+- `src/prometheus/signatures/` directory
+
+**Success Metric**: Automated obfuscator detection tools misidentify Prometheus output.
+
+---
+
+#### **Objective 11.2: Constant-Time Output Generation**
+**Problem**: Obfuscation time could leak information about techniques used.
+
+**Solution**:
+- Normalize obfuscation time across different files
+- Add random delays to equalize timing
+- Make timing independent of step selection
+- Prevent timing-based fingerprinting
+
+**Implementation**:
+- `src/prometheus/pipeline.lua`: Add timing normalization
+- Random delay injection
+
+**Success Metric**: Obfuscation time variations are unpredictable and uninformative.
+
+---
+
+### **Phase 12: Quality Assurance & Metrics**
+
+#### **Objective 12.1: Uniqueness Measurement Tool**
+**Problem**: No automated way to measure per-file uniqueness.
+
+**Solution**:
+Create `uniqueness_analyzer.lua` tool that:
+- Obfuscates same file 100 times
+- Compares outputs using:
+  - Levenshtein distance
+  - AST structural similarity
+  - Token sequence similarity
+  - N-gram analysis
+  - Pattern frequency analysis
+- Reports uniqueness percentage
+- Identifies remaining patterns
+
+**Implementation**:
+- Create `tools/uniqueness_analyzer.lua`
+- Implement similarity metrics
+- Generate detailed reports
+
+**Files to Create**:
+- `tools/uniqueness_analyzer.lua`
+
+**Success Metric**: Tool reports 65%+ uniqueness for all presets.
+
+---
+
+#### **Objective 12.2: Pattern Database**
+**Problem**: Unknown which patterns are most detectable.
+
+**Solution**:
+- Build database of known de-obfuscation patterns
+- Test each pattern against current implementation
+- Automated regression testing for pattern elimination
+- Continuous monitoring of new patterns
+
+**Implementation**:
+- Create `tools/pattern_database.lua`
+- Database of patterns in JSON/Lua format
+- Automated pattern detection tests
+
+**Files to Create**:
+- `tools/pattern_database.lua`
+- `tests/patterns/` directory
+
+**Success Metric**: Zero known patterns detectable in output.
+
+---
+
+## Implementation Priority Matrix
+
+### **Critical Priority** (Highest Impact on Uniqueness)
+1. Phase 1: Polymorphic Foundation - **Objective 1.1 & 1.2**
+2. Phase 2: String Encryption Polymorphism - **Objective 2.1 & 2.2**
+3. Phase 5: Expression Polymorphism - **Objective 5.1 & 5.2**
+4. Phase 8: VM Polymorphism - **Objective 8.1 & 8.2**
+
+### **High Priority** (Major Uniqueness Contributors)
+5. Phase 3: Constant Array Polymorphism - **Objective 3.1 & 3.2**
+6. Phase 6: Variable Name Polymorphism - **Objective 6.1 & 6.2**
+7. Phase 4: Control Flow Transformation - **Objective 4.1 & 4.2**
+
+### **Medium Priority** (Uniqueness Enhancers)
+8. Phase 7: Metatable Polymorphism - **Objective 7.1 & 7.2**
+9. Phase 9: Code Structure Randomization - **Objective 9.1 & 9.2**
+10. Phase 10: Preset Randomization - **Objective 10.1 & 10.2**
+
+### **Low Priority** (Polishing & Anti-Analysis)
+11. Phase 11: Anti-Pattern-Analysis Features - **Objective 11.1 & 11.2**
+12. Phase 12: Quality Assurance & Metrics - **Objective 12.1 & 12.2**
+
+---
+
+## Success Criteria
+
+### **Phase Completion Criteria**
+
+Each phase is complete when:
+1. All objectives implemented and tested
+2. No regressions in existing obfuscation quality
+3. Uniqueness analyzer shows improvement
+4. Pattern database shows no detectable patterns for that phase
+5. All files documented with implementation notes
+
+### **Final Success Criteria**
+
+Project is complete when:
+1. **Uniqueness Score**: 65%+ measured by uniqueness analyzer
+2. **Pattern Detection**: 0% of known patterns detected
+3. **Tool Resilience**: Automated de-obfuscation tools fail on all test cases
+4. **Performance**: Obfuscation time <5x current baseline
+5. **Correctness**: 100% test suite pass rate
+6. **Compatibility**: Full Lua 5.1, Lua 5.4, LuaU, and FiveM support maintained
+
+---
+
+## Testing Strategy
+
+### **Per-Phase Testing**
+For each phase:
+1. Unit tests for new components
+2. Integration tests for modified steps
+3. Uniqueness measurement before/after
+4. Pattern detection testing
+5. Performance benchmarking
+
+### **Regression Testing**
+- All existing test files must continue to pass
+- Obfuscated output must execute identically to source
+- No performance degradation beyond acceptable limits
+
+### **Uniqueness Testing**
+- Obfuscate same file 100 times
+- Measure uniqueness percentage
+- Target: 65%+ uniqueness after all phases complete
+
+### **Adversarial Testing**
+- Attempt to build automated de-obfuscator
+- Attempt pattern-based detection
+- Attempt signature matching
+- All attempts must fail
+
+---
+
+## Architecture Decisions
+
+### **Backwards Compatibility**
+- All existing presets continue to work
+- New presets add polymorphic features
+- Legacy mode available for reproducible builds
+
+### **Configuration**
+- New `Polymorphism` setting in presets:
+  - `false`: Legacy mode (current behavior)
+  - `true`: Enable all polymorphic features
+  - `"conservative"`: Limited randomization
+  - `"aggressive"`: Maximum randomization
+
+### **Performance**
+- Target: <3x slowdown compared to current implementation
+- Lazy generation of random components
+- Caching of expensive random operations
+- Parallel processing where possible (future optimization)
+
+### **Debugging**
+- Polymorphic seed logging for reproducibility
+- Debug mode disables randomization for testing
+- Verbose mode shows which variants were selected
+
+---
+
+## Documentation Requirements
+
+### **For Each Phase**
+Create documentation in `doc/uniqueness/`:
+1. `phase-N-overview.md` - Phase objectives and approach
+2. `phase-N-implementation.md` - Technical implementation details
+3. `phase-N-testing.md` - Testing procedures and results
+4. `phase-N-patterns.md` - Patterns eliminated by this phase
+
+### **API Documentation**
+Document all new modules:
+- `src/prometheus/entropy.lua` - Entropy generation API
+- `src/prometheus/polymorphism.lua` - Polymorphism framework API
+- All new step variants
+- All new generators
+
+### **User Documentation**
+Update user-facing docs:
+- `doc/getting-started/uniqueness.md` - Uniqueness features guide
+- `doc/advanced/polymorphism.md` - Advanced polymorphic configuration
+- Preset documentation with uniqueness notes
+
+---
+
+## File Structure (New Files)
+
+```
+Prometheus/
+├── src/
+│   ├── prometheus/
+│   │   ├── entropy.lua                          # Phase 1
+│   │   ├── polymorphism.lua                      # Phase 1
+│   │   ├── variants/                             # Phase 1
+│   │   │   └── registry.lua
+│   │   ├── steps/
+│   │   │   ├── EncryptStrings/
+│   │   │   │   └── variants/                     # Phase 2
+│   │   │   │       ├── lcg.lua
+│   │   │   │       ├── xorshift.lua
+│   │   │   │       ├── chacha20.lua
+│   │   │   │       ├── blum_blum_shub.lua
+│   │   │   │       └── mixed_congruential.lua
+│   │   │   ├── ConstantArray/
+│   │   │   │   ├── indexing_strategies/         # Phase 3
+│   │   │   │   │   ├── direct_offset.lua
+│   │   │   │   │   ├── mathematical.lua
+│   │   │   │   │   ├── bitwise.lua
+│   │   │   │   │   ├── indirection.lua
+│   │   │   │   │   ├── function_chain.lua
+│   │   │   │   │   └── hybrid.lua
+│   │   │   │   └── encodings/                   # Phase 3
+│   │   │   │       ├── base64_custom.lua
+│   │   │   │       ├── base85.lua
+│   │   │   │       ├── hex_shuffle.lua
+│   │   │   │       ├── rle.lua
+│   │   │   │       └── hybrid.lua
+│   │   │   ├── ControlFlowFlatten.lua           # Phase 4
+│   │   │   ├── NumbersToExpressions/
+│   │   │   │   └── generators/                  # Phase 5
+│   │   │   │       ├── addition.lua
+│   │   │   │       ├── subtraction.lua
+│   │   │   │       ├── multiplication.lua
+│   │   │   │       ├── modulo.lua
+│   │   │   │       ├── bitwise.lua
+│   │   │   │       ├── power.lua
+│   │   │   │       ├── string_length.lua
+│   │   │   │       ├── table_length.lua
+│   │   │   │       ├── math_functions.lua
+│   │   │   │       ├── trigonometric.lua
+│   │   │   │       ├── ternary.lua
+│   │   │   │       ├── constant_resistant.lua
+│   │   │   │       ├── mixed.lua
+│   │   │   │       └── polynomial.lua
+│   │   │   ├── StatementShuffle.lua             # Phase 9
+│   │   │   ├── DeadCodeInjection.lua            # Phase 9
+│   │   │   └── SignaturePoisoning.lua           # Phase 11
+│   │   ├── namegenerators/
+│   │   │   ├── unicode_confusables.lua          # Phase 6
+│   │   │   ├── homoglyph.lua                    # Phase 6
+│   │   │   ├── emoji.lua                        # Phase 6
+│   │   │   ├── dictionary.lua                   # Phase 6
+│   │   │   ├── fibonacci.lua                    # Phase 6
+│   │   │   ├── prime.lua                        # Phase 6
+│   │   │   └── hash_derived.lua                 # Phase 6
+│   │   └── signatures/                          # Phase 11
+│   │       ├── luraph.lua
+│   │       ├── ironbrew.lua
+│   │       └── psu.lua
+├── tools/
+│   ├── uniqueness_analyzer.lua                  # Phase 12
+│   └── pattern_database.lua                     # Phase 12
+├── tests/
+│   └── patterns/                                # Phase 12
+│       ├── encryption_patterns.lua
+│       ├── constant_array_patterns.lua
+│       ├── vm_patterns.lua
+│       └── metatable_patterns.lua
+└── doc/
+    └── uniqueness/                              # All phases
+        ├── phase-1-overview.md
+        ├── phase-1-implementation.md
+        ├── ... (through phase 12)
+        ├── uniqueness-guide.md
+        └── polymorphism-advanced.md
+```
+
+---
+
+## Key Implementation Notes
+
+### **Entropy Mixing**
+Use cryptographic-quality entropy mixing:
+```lua
+-- Combine multiple entropy sources
+local hash = sha256(timestamp .. file_hash .. process_id .. system_entropy)
+local seed = tonumber(hash:sub(1, 16), 16)
+```
+
+### **Algorithm Variant Selection**
+```lua
+-- Example variant selection in EncryptStrings
+local variants = {
+    require("prometheus.steps.EncryptStrings.variants.lcg"),
+    require("prometheus.steps.EncryptStrings.variants.xorshift"),
+    -- ... more variants
+}
+local selected = variants[entropy:random(1, #variants)]
+```
+
+### **Per-Step Entropy Isolation**
+```lua
+-- Each step gets independent entropy context
+function Pipeline:apply(ast)
+    for i, step in ipairs(self.steps) do
+        local stepEntropy = self.entropy:derive(step.Name .. i)
+        step:apply(ast, self, stepEntropy)
+    end
+end
+```
+
+### **Variant Registration**
+```lua
+-- src/prometheus/polymorphism.lua
+local Polymorphism = {}
+function Polymorphism:registerVariant(stepName, variantName, variant)
+    self.registry[stepName] = self.registry[stepName] or {}
+    self.registry[stepName][variantName] = variant
+end
+```
+
+---
+
+## Expected Outcomes
+
+### **Uniqueness Metrics (Post-Implementation)**
+- **String Encryption**: 95%+ unique per file
+- **Constant Arrays**: 85%+ unique per file
+- **Variable Names**: 99%+ unique per file
+- **Control Flow**: 70%+ unique per file
+- **Expression Trees**: 90%+ unique per file
+- **VM Bytecode**: 100% unique per file
+- **Overall**: 65-75% unique per file
+
+### **De-Obfuscation Resistance**
+- **Pattern-Based Tools**: 100% failure rate
+- **Signature Matching**: 100% failure rate
+- **Automated AST Analysis**: 95%+ failure rate
+- **VM Disassembly**: 100% failure rate (incompatible instruction sets)
+
+### **Performance Impact**
+- **Obfuscation Time**: 2-3x current baseline
+- **Output Size**: 1.1-1.3x current baseline
+- **Runtime Performance**: No change (obfuscated code runs at same speed)
+
+---
+
+## Conclusion
+
+This roadmap transforms Prometheus from a deterministic obfuscator into a polymorphic engine that achieves 65%+ uniqueness per file. By implementing all 12 phases, Prometheus will produce output where:
+
+1. **Every file is structurally unique** - Same source produces different obfuscated output each time
+2. **Pattern-based de-obfuscation fails** - No consistent patterns to target
+3. **Signature detection fails** - No consistent fingerprints
+4. **Manual analysis is required** - Attackers must reverse each file individually
+
+This forces attackers into the most expensive and time-consuming analysis path, achieving the core objective of breaking automated de-obfuscation tools and making pattern-based attacks infeasible.
+
+---
+
+**Implementation Status**: Ready to begin Phase 1
+**Target Completion**: All phases implementable following this roadmap
+**Maintenance**: Continuous pattern monitoring and variant additions

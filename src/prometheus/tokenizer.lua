@@ -236,6 +236,21 @@ end
 
 -- skip one or 0 Comments and return wether one was found
 function Tokenizer:skipComment()
+	-- C-style block comments (FiveM/CfxLua extension)
+	if(is(self, "/", 0) and is(self, "*", 1)) then
+		self.index = self.index + 2;
+		-- Scan until */ is found
+		while self.index < self.length do
+			if(is(self, "*", 0) and is(self, "/", 1)) then
+				self.index = self.index + 2;
+				return true;
+			end
+			self.index = self.index + 1;
+		end
+		-- Unterminated block comment
+		logger:error(generateError(self, "Unterminated C-style block comment"));
+	end
+
 	if(is(self, "-", 0) and is(self, "-", 1)) then
 		self.index = self.index + 2;
 		if(is(self, "[")) then
@@ -473,6 +488,34 @@ function Tokenizer:multiLineString()
 	return nil, false -- There was not an actual multiline string at the given Position
 end
 
+-- FiveM/CfxLua: Backtick hash literals
+-- Compiles `identifier` to Jenkins one-at-a-time hash at parse time
+function Tokenizer:backtickLiteral()
+	local startPos = self.index;
+	expect(self, "`");
+
+	local buffer = {};
+	while not is(self, "`") do
+		if is(self, Tokenizer.EOF_CHAR) then
+			logger:error(generateError(self, "Unterminated backtick literal"));
+		end
+		-- Newlines likely disallowed (following string literal conventions)
+		if is(self, "\n") then
+			logger:error(generateError(self, "Newlines not allowed in backtick literals"));
+		end
+
+		buffer[#buffer + 1] = get(self);
+	end
+
+	expect(self, "`");
+
+	local str = table.concat(buffer);
+	local hash = util.jenkinsHash(str);
+
+	-- Return as number token with hash value
+	return token(self, startPos, Tokenizer.TokenKind.Number, hash);
+end
+
 function Tokenizer:symbol()
 	local startPos = self.index;
 	for len = self.MaxSymbolLength, 1, -1 do
@@ -518,6 +561,11 @@ function Tokenizer:next()
 		if isString then
 			return value;
 		end
+	end
+
+	-- FiveM/CfxLua: Backtick Hash Literals
+	if(is(self, "`")) then
+		return self:backtickLiteral();
 	end
 
 	-- Number starting with dot

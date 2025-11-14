@@ -47,6 +47,12 @@ local compundStats = lookupify{
 	AstKind.CompoundModStatement,
 	AstKind.CompoundPowStatement,
 	AstKind.CompoundConcatStatement,
+	-- FiveM/Lua54 Bitwise Compound Statements
+	AstKind.CompoundLeftShiftStatement,
+	AstKind.CompoundRightShiftStatement,
+	AstKind.CompoundBitwiseAndStatement,
+	AstKind.CompoundBitwiseOrStatement,
+	AstKind.CompoundBitwiseXorStatement,
 }
 
 function visitBlock(block, previsit, postvisit, data, isFunctionBlock)
@@ -122,6 +128,8 @@ function visitStatement(statement, previsit, postvisit, data)
 		statement.body = visitBlock(statement.body, previsit, postvisit, data, true);
 		data.functionData = parentFunctionData;
 	elseif(statement.kind == AstKind.DoStatement) then
+		statement.body = visitBlock(statement.body, previsit, postvisit, data, false);
+	elseif(statement.kind == AstKind.DeferStatement) then
 		statement.body = visitBlock(statement.body, previsit, postvisit, data, false);
 	elseif(statement.kind == AstKind.WhileStatement) then
 		statement.condition = visitExpression(statement.condition, previsit, postvisit, data);
@@ -240,6 +248,24 @@ function visitExpression(expression, previsit, postvisit, data)
 	if(expression.kind == AstKind.IndexExpression or expression.kind == AstKind.AssignmentIndexing) then
 		expression.base = visitExpression(expression.base, previsit, postvisit, data);
 		expression.index = visitExpression(expression.index, previsit, postvisit, data);
+	end
+
+	-- FiveM/Lua54 Safe Navigation Expressions
+	if(expression.kind == AstKind.SafeIndexExpression) then
+		expression.base = visitExpression(expression.base, previsit, postvisit, data);
+		expression.index = visitExpression(expression.index, previsit, postvisit, data);
+	end
+
+	if(expression.kind == AstKind.SafeMemberExpression) then
+		expression.base = visitExpression(expression.base, previsit, postvisit, data);
+		-- property is a string, no need to visit
+	end
+
+	if(expression.kind == AstKind.SafeFunctionCallExpression) then
+		expression.base = visitExpression(expression.base, previsit, postvisit, data);
+		for i, arg in ipairs(expression.args) do
+			expression.args[i] = visitExpression(arg, previsit, postvisit, data);
+		end
 	end
 
 	if(type(postvisit) == "function") then

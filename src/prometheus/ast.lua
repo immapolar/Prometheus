@@ -2,6 +2,7 @@
 --
 -- ast.lua
 
+local bit32 = require("prometheus.bit");
 local Ast = {}
 
 local AstKind = {
@@ -34,6 +35,16 @@ local AstKind = {
 	CompoundModStatement = "CompoundModStatement";
 	CompoundPowStatement = "CompoundPowStatement";
 	CompoundConcatStatement = "CompoundConcatStatement";
+
+	-- FiveM/Lua54 Bitwise Compound Statements
+	CompoundLeftShiftStatement = "CompoundLeftShiftStatement";
+	CompoundRightShiftStatement = "CompoundRightShiftStatement";
+	CompoundBitwiseAndStatement = "CompoundBitwiseAndStatement";
+	CompoundBitwiseOrStatement = "CompoundBitwiseOrStatement";
+	CompoundBitwiseXorStatement = "CompoundBitwiseXorStatement";
+
+	-- FiveM/Lua54 Defer Statement
+	DeferStatement = "DeferStatement";
 
 	-- Assignment Index
 	AssignmentIndexing = "AssignmentIndexing";
@@ -76,6 +87,11 @@ local AstKind = {
 	VariableExpression = "VariableExpression";
 	FunctionLiteralExpression = "FunctionLiteralExpression";
 	TableConstructorExpression = "TableConstructorExpression";
+
+	-- FiveM/Lua54 Safe Navigation Expressions
+	SafeIndexExpression = "SafeIndexExpression";              -- x?.[expr]
+	SafeMemberExpression = "SafeMemberExpression";            -- x?.name
+	SafeFunctionCallExpression = "SafeFunctionCallExpression"; -- x?.()
 
 	-- Table Entry
 	TableEntry = "TableEntry";
@@ -296,6 +312,46 @@ function Ast.CompoundConcatStatement(lhs, rhs)
 	}
 end
 
+function Ast.CompoundLeftShiftStatement(lhs, rhs)
+	return {
+		kind = AstKind.CompoundLeftShiftStatement,
+		lhs = lhs,
+		rhs = rhs,
+	}
+end
+
+function Ast.CompoundRightShiftStatement(lhs, rhs)
+	return {
+		kind = AstKind.CompoundRightShiftStatement,
+		lhs = lhs,
+		rhs = rhs,
+	}
+end
+
+function Ast.CompoundBitwiseAndStatement(lhs, rhs)
+	return {
+		kind = AstKind.CompoundBitwiseAndStatement,
+		lhs = lhs,
+		rhs = rhs,
+	}
+end
+
+function Ast.CompoundBitwiseOrStatement(lhs, rhs)
+	return {
+		kind = AstKind.CompoundBitwiseOrStatement,
+		lhs = lhs,
+		rhs = rhs,
+	}
+end
+
+function Ast.CompoundBitwiseXorStatement(lhs, rhs)
+	return {
+		kind = AstKind.CompoundBitwiseXorStatement,
+		lhs = lhs,
+		rhs = rhs,
+	}
+end
+
 function Ast.FunctionCallStatement(base, args)
 	return {
 		kind = AstKind.FunctionCallStatement,
@@ -314,6 +370,13 @@ end
 function Ast.DoStatement(body)
 	return {
 		kind = AstKind.DoStatement,
+		body = body,
+	}
+end
+
+function Ast.DeferStatement(body)
+	return {
+		kind = AstKind.DeferStatement,
 		body = body,
 	}
 end
@@ -675,7 +738,7 @@ end
 
 function Ast.FloorDivExpression(lhs, rhs, simplify)
 	if(simplify and rhs.isConstant and lhs.isConstant and rhs.value ~= 0) then
-		local success, val = pcall(function() return lhs.value // rhs.value end);
+		local success, val = pcall(function() return math.floor(lhs.value / rhs.value) end);
 		if success then
 			return Ast.ConstantNode(val);
 		end
@@ -691,7 +754,7 @@ end
 
 function Ast.BitwiseAndExpression(lhs, rhs, simplify)
 	if(simplify and rhs.isConstant and lhs.isConstant) then
-		local success, val = pcall(function() return lhs.value & rhs.value end);
+		local success, val = pcall(function() return bit32.band(lhs.value, rhs.value) end);
 		if success then
 			return Ast.ConstantNode(val);
 		end
@@ -707,7 +770,7 @@ end
 
 function Ast.BitwiseOrExpression(lhs, rhs, simplify)
 	if(simplify and rhs.isConstant and lhs.isConstant) then
-		local success, val = pcall(function() return lhs.value | rhs.value end);
+		local success, val = pcall(function() return bit32.bor(lhs.value, rhs.value) end);
 		if success then
 			return Ast.ConstantNode(val);
 		end
@@ -723,7 +786,7 @@ end
 
 function Ast.BitwiseXorExpression(lhs, rhs, simplify)
 	if(simplify and rhs.isConstant and lhs.isConstant) then
-		local success, val = pcall(function() return lhs.value ~ rhs.value end);
+		local success, val = pcall(function() return bit32.bxor(lhs.value, rhs.value) end);
 		if success then
 			return Ast.ConstantNode(val);
 		end
@@ -739,7 +802,7 @@ end
 
 function Ast.LeftShiftExpression(lhs, rhs, simplify)
 	if(simplify and rhs.isConstant and lhs.isConstant) then
-		local success, val = pcall(function() return lhs.value << rhs.value end);
+		local success, val = pcall(function() return bit32.lshift(lhs.value, rhs.value) end);
 		if success then
 			return Ast.ConstantNode(val);
 		end
@@ -755,7 +818,7 @@ end
 
 function Ast.RightShiftExpression(lhs, rhs, simplify)
 	if(simplify and rhs.isConstant and lhs.isConstant) then
-		local success, val = pcall(function() return lhs.value >> rhs.value end);
+		local success, val = pcall(function() return bit32.rshift(lhs.value, rhs.value) end);
 		if success then
 			return Ast.ConstantNode(val);
 		end
@@ -771,7 +834,7 @@ end
 
 function Ast.BitwiseNotExpression(rhs, simplify)
 	if(simplify and rhs.isConstant) then
-		local success, val = pcall(function() return ~rhs.value end);
+		local success, val = pcall(function() return bit32.bnot(rhs.value) end);
 		if success then
 			return Ast.ConstantNode(val);
 		end
@@ -850,6 +913,33 @@ function Ast.IndexExpression(base, index)
 		kind = AstKind.IndexExpression,
 		base = base,
 		index = index,
+		isConstant = false,
+	}
+end
+
+function Ast.SafeIndexExpression(base, index)
+	return {
+		kind = AstKind.SafeIndexExpression,
+		base = base,
+		index = index,
+		isConstant = false,
+	}
+end
+
+function Ast.SafeMemberExpression(base, property)
+	return {
+		kind = AstKind.SafeMemberExpression,
+		base = base,
+		property = property,  -- string property name
+		isConstant = false,
+	}
+end
+
+function Ast.SafeFunctionCallExpression(base, args)
+	return {
+		kind = AstKind.SafeFunctionCallExpression,
+		base = base,
+		args = args,
 		isConstant = false,
 	}
 end
