@@ -89,6 +89,8 @@ while i <= #arg do
             luaVersion = "Lua51";
         elseif curr == "--LuaU" then
             luaVersion = "LuaU";
+        elseif curr == "--Lua54" then
+            luaVersion = "Lua54";
         elseif curr == "--pretty" then
             prettyPrint = true;
         elseif curr == "--saveerrors" then
