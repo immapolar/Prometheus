@@ -52,52 +52,187 @@ local function callNameGenerator(generatorFunction, ...)
 	return generatorFunction(...);
 end
 
+-- Phase 7, Objective 7.1: Dynamic Metamethod Selection
+-- Expanded metamethod table with all 19 Lua metamethods for polymorphic proxification
+-- Each entry defines: constructor (AST node builder), key (metamethod name),
+-- isUnary (true for single-argument operations), luaVersion (required Lua version)
+local Enums = require("prometheus.enums");
+
 local MetatableExpressions = {
+    -- Arithmetic Operators (Binary)
     {
         constructor = Ast.AddExpression,
-        key = "__add";
+        key = "__add",
+        isUnary = false,
     },
     {
         constructor = Ast.SubExpression,
-        key = "__sub";
-    },
-    {
-        constructor = Ast.IndexExpression,
-        key = "__index";
+        key = "__sub",
+        isUnary = false,
     },
     {
         constructor = Ast.MulExpression,
-        key = "__mul";
+        key = "__mul",
+        isUnary = false,
     },
     {
         constructor = Ast.DivExpression,
-        key = "__div";
+        key = "__div",
+        isUnary = false,
+    },
+    {
+        constructor = Ast.ModExpression,
+        key = "__mod",
+        isUnary = false,
     },
     {
         constructor = Ast.PowExpression,
-        key = "__pow";
+        key = "__pow",
+        isUnary = false,
+    },
+
+    -- Arithmetic Operators (Unary)
+    {
+        constructor = Ast.NegateExpression,
+        key = "__unm",
+        isUnary = true,
+    },
+
+    -- Bitwise Operators (Binary) - Lua 5.4 Only
+    {
+        constructor = Ast.BitwiseAndExpression,
+        key = "__band",
+        isUnary = false,
+        luaVersion = Enums.LuaVersion.Lua54,
     },
     {
+        constructor = Ast.BitwiseOrExpression,
+        key = "__bor",
+        isUnary = false,
+        luaVersion = Enums.LuaVersion.Lua54,
+    },
+    {
+        constructor = Ast.BitwiseXorExpression,
+        key = "__bxor",
+        isUnary = false,
+        luaVersion = Enums.LuaVersion.Lua54,
+    },
+    {
+        constructor = Ast.LeftShiftExpression,
+        key = "__shl",
+        isUnary = false,
+        luaVersion = Enums.LuaVersion.Lua54,
+    },
+    {
+        constructor = Ast.RightShiftExpression,
+        key = "__shr",
+        isUnary = false,
+        luaVersion = Enums.LuaVersion.Lua54,
+    },
+
+    -- Bitwise Operators (Unary) - Lua 5.4 Only
+    {
+        constructor = Ast.BitwiseNotExpression,
+        key = "__bnot",
+        isUnary = true,
+        luaVersion = Enums.LuaVersion.Lua54,
+    },
+
+    -- Relational Operators (Binary)
+    {
+        constructor = Ast.EqualsExpression,
+        key = "__eq",
+        isUnary = false,
+    },
+    {
+        constructor = Ast.LessThanExpression,
+        key = "__lt",
+        isUnary = false,
+    },
+    {
+        constructor = Ast.LessThanOrEqualsExpression,
+        key = "__le",
+        isUnary = false,
+    },
+
+    -- Concatenation Operator (Binary)
+    {
         constructor = Ast.StrCatExpression,
-        key = "__concat";
-    }
+        key = "__concat",
+        isUnary = false,
+    },
+
+    -- Length Operator (Unary)
+    {
+        constructor = Ast.LenExpression,
+        key = "__len",
+        isUnary = true,
+    },
+
+    -- Indexing Operator (Special - Binary)
+    {
+        constructor = Ast.IndexExpression,
+        key = "__index",
+        isUnary = false,
+    },
 }
 
 function ProifyLocals:init(settings)
 	
 end
 
+-- Phase 7, Objective 7.1: Dynamic Metamethod Selection
+-- Generates random metamethod selection for a proxified variable
+-- Filters metamethods by Lua version and separates unary/binary operations
+-- setValue requires binary operations, getValue can use binary or unary
 local function generateLocalMetatableInfo(pipeline)
     local usedOps = {};
     local info = {};
-    for i, v in ipairs({"setValue","getValue", "index"}) do
-        local rop;
-        repeat
-            rop = MetatableExpressions[math.random(#MetatableExpressions)];
-        until not usedOps[rop];
-        usedOps[rop] = true;
-        info[v] = rop;
+
+    -- Filter metamethods by Lua version compatibility
+    local availableMetamethods = {};
+    for i, metamethod in ipairs(MetatableExpressions) do
+        -- Include if no luaVersion restriction OR matches current Lua version
+        if not metamethod.luaVersion or metamethod.luaVersion == pipeline.LuaVersion then
+            table.insert(availableMetamethods, metamethod);
+        end
     end
+
+    -- Separate binary and unary operations
+    local binaryOps = {};
+    local unaryOps = {};
+    for i, metamethod in ipairs(availableMetamethods) do
+        if metamethod.isUnary then
+            table.insert(unaryOps, metamethod);
+        else
+            table.insert(binaryOps, metamethod);
+        end
+    end
+
+    -- setValue: Must use binary operation (requires 2 arguments)
+    local setValueOp;
+    repeat
+        setValueOp = binaryOps[math.random(#binaryOps)];
+    until not usedOps[setValueOp];
+    usedOps[setValueOp] = true;
+    info.setValue = setValueOp;
+
+    -- getValue: Can use binary OR unary operation
+    local getValueOp;
+    repeat
+        getValueOp = availableMetamethods[math.random(#availableMetamethods)];
+    until not usedOps[getValueOp];
+    usedOps[getValueOp] = true;
+    info.getValue = getValueOp;
+
+    -- index: Reserved for future use (currently unused in assignment flow)
+    -- Select from remaining operations
+    local indexOp;
+    repeat
+        indexOp = availableMetamethods[math.random(#availableMetamethods)];
+    until not usedOps[indexOp];
+    usedOps[indexOp] = true;
+    info.index = indexOp;
 
     info.valueName = callNameGenerator(pipeline.namegenerator, math.random(1, 4096));
 
@@ -261,17 +396,24 @@ function ProifyLocals:apply(ast, pipeline)
             local localMetatableInfo = getLocalMetatableInfo(node.scope, node.id);
             -- Apply Only to Some Variables if Treshold is non 1
             if localMetatableInfo then
-                local literal;
-                if self.LiteralType == "dictionary" then
-                    literal = RandomLiterals.Dictionary();
-                elseif self.LiteralType == "number" then
-                    literal = RandomLiterals.Number();
-                elseif self.LiteralType == "string" then
-                    literal = RandomLiterals.String(pipeline);
+                -- Phase 7, Objective 7.1: Handle unary vs binary getValue operations
+                if localMetatableInfo.getValue.isUnary then
+                    -- Unary operation: only pass the node (e.g., __unm, __bnot, __len)
+                    return localMetatableInfo.getValue.constructor(node);
                 else
-                    literal = RandomLiterals.Any(pipeline);
+                    -- Binary operation: pass node and literal (e.g., __add, __sub, etc.)
+                    local literal;
+                    if self.LiteralType == "dictionary" then
+                        literal = RandomLiterals.Dictionary();
+                    elseif self.LiteralType == "number" then
+                        literal = RandomLiterals.Number();
+                    elseif self.LiteralType == "string" then
+                        literal = RandomLiterals.String(pipeline);
+                    else
+                        literal = RandomLiterals.Any(pipeline);
+                    end
+                    return localMetatableInfo.getValue.constructor(node, literal);
                 end
-                return localMetatableInfo.getValue.constructor(node, literal);
             end
         end
 
