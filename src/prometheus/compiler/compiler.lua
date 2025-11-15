@@ -1898,6 +1898,13 @@ function Compiler:compileStatement(statement, funcDepth)
         return;
     end
 
+    -- Nop Statement (No Operation)
+    -- NopStatements are placeholder nodes that perform no action
+    -- Simply skip them during compilation
+    if(statement.kind == AstKind.NopStatement) then
+        return;
+    end
+
     logger:error(string.format("%s is not a compileable statement!", statement.kind));
 end
 
