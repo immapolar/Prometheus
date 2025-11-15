@@ -139,21 +139,11 @@ local MetatableExpressions = {
     },
 
     -- Relational Operators (Binary)
-    {
-        constructor = Ast.EqualsExpression,
-        key = "__eq",
-        isUnary = false,
-    },
-    {
-        constructor = Ast.LessThanExpression,
-        key = "__lt",
-        isUnary = false,
-    },
-    {
-        constructor = Ast.LessThanOrEqualsExpression,
-        key = "__le",
-        isUnary = false,
-    },
+    -- NOTE: __eq, __lt, __le are EXCLUDED from ProxifyLocals because:
+    -- - They only work when comparing two tables/userdata with same metamethod
+    -- - ProxifyLocals always uses proxy_table op literal (mixed types)
+    -- - Lua will error: "attempt to compare table with number"
+    -- These metamethods require semantic boolean comparisons, not value retrieval
 
     -- Concatenation Operator (Binary)
     {
@@ -162,11 +152,12 @@ local MetatableExpressions = {
         isUnary = false,
     },
 
-    -- Length Operator (Unary)
+    -- Length Operator (Unary) - Lua 5.4 Only (__len not supported on tables in Lua 5.1)
     {
         constructor = Ast.LenExpression,
         key = "__len",
         isUnary = true,
+        luaVersion = Enums.LuaVersion.Lua54,
     },
 
     -- Indexing Operator (Special - Binary)
@@ -264,7 +255,16 @@ function ProifyLocals:CreateAssignmentExpression(info, expr, parentScope)
     -- Getvalue Entry
     local getValueFunctionScope = Scope:new(parentScope);
     local getValueSelf = getValueFunctionScope:addVariable();
-    local getValueArg = getValueFunctionScope:addVariable();
+    local getValueArg = nil;
+
+    -- Phase 7.1: Unary metamethods only take one argument (self)
+    local getValueArgs = { Ast.VariableExpression(getValueFunctionScope, getValueSelf) };
+    if not info.getValue.isUnary then
+        -- Binary metamethods take two arguments (self, arg)
+        getValueArg = getValueFunctionScope:addVariable();
+        table.insert(getValueArgs, Ast.VariableExpression(getValueFunctionScope, getValueArg));
+    end
+
     local getValueIdxExpr;
     if(info.getValue.key == "__index" or info.setValue.key == "__index") then
         getValueIdxExpr = Ast.FunctionCallExpression(Ast.VariableExpression(getValueFunctionScope:resolveGlobal("rawget")), {
@@ -275,10 +275,7 @@ function ProifyLocals:CreateAssignmentExpression(info, expr, parentScope)
         getValueIdxExpr = Ast.IndexExpression(Ast.VariableExpression(getValueFunctionScope, getValueSelf), Ast.StringExpression(info.valueName));
     end
     local getvalueFunctionLiteral = Ast.FunctionLiteralExpression(
-        {
-            Ast.VariableExpression(getValueFunctionScope, getValueSelf), -- Argument 1
-            Ast.VariableExpression(getValueFunctionScope, getValueArg), -- Argument 2
-        },
+        getValueArgs,
         Ast.Block({ -- Create Function Body
             Ast.ReturnStatement({
                 getValueIdxExpr;

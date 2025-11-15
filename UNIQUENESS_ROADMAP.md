@@ -401,19 +401,20 @@ Implement 8 name generator variants (randomly selected per file):
 - Per-variable randomization (each variable uses different metamethods)
 
 **Implementation**:
-- Modified `src/prometheus/steps/ProxifyLocals.lua` (lines 55-178)
-- Expanded MetatableExpressions from 7 to 19 metamethods
-- Added Lua version filtering for bitwise operations (Lua 5.4 only)
+- Modified `src/prometheus/steps/ProxifyLocals.lua` (lines 55-295)
+- Expanded MetatableExpressions from 7 to 16 usable metamethods
+- Added Lua version filtering for bitwise operations and __len (Lua 5.4 only)
 - Implemented unary operation support (__unm, __bnot, __len)
 - Updated getValue constructor calls to handle unary vs binary operations
 - setValue restricted to binary operations only (requires 2 arguments)
 - getValue supports both binary and unary operations
+- Fixed CreateAssignmentExpression to generate correct function signatures for unary metamethods
 
 **Changes Made**:
 1. MetatableExpressions table expanded with:
    - `isUnary` field (true for __unm, __bnot, __len)
-   - `luaVersion` field (Lua54 for bitwise operations)
-   - All 19 metamethods categorized by type
+   - `luaVersion` field (Lua54 for bitwise operations and __len)
+   - 16 usable metamethods (excluded __eq, __lt, __le - see limitations)
 2. generateLocalMetatableInfo() refactored:
    - Filters metamethods by pipeline.LuaVersion
    - Separates binary and unary operations
@@ -422,11 +423,31 @@ Implement 8 name generator variants (randomly selected per file):
 3. Variable expression handling updated:
    - Unary getValue: `constructor(node)` - single argument
    - Binary getValue: `constructor(node, literal)` - two arguments
+4. CreateAssignmentExpression fixed (lines 264-294):
+   - getValue function signature now dynamic based on isUnary flag
+   - Unary metamethods: function(self) - 1 argument
+   - Binary metamethods: function(self, arg) - 2 arguments
+
+**Critical Bugs Fixed**:
+1. **Unary Metamethod Function Signature Bug**: getValue functions were generated with 2 arguments even for unary metamethods (__unm, __bnot, __len), causing incorrect behavior. Fixed by dynamically building argument list based on isUnary flag.
+2. **Lua 5.1 __len Incompatibility**: __len metamethod doesn't work on tables in Lua 5.1 (returns array length, ignoring metamethod). Added luaVersion = Lua54 restriction to __len.
+3. **Comparison Metamethod Incompatibility**: __eq, __lt, __le only work when comparing two tables/userdata with same metamethod. ProxifyLocals uses proxy_table op literal (mixed types), causing "attempt to compare table with number" error. **Solution**: Excluded __eq, __lt, __le from ProxifyLocals metamethod pool.
+
+**Metamethod Availability**:
+- **Lua 5.1/LuaU**: 9 metamethods (__add, __sub, __mul, __div, __mod, __pow, __unm, __concat, __index)
+- **Lua 5.4**: 16 metamethods (Lua 5.1 + __band, __bor, __bxor, __shl, __shr, __bnot, __len)
+- **Excluded**: __eq, __lt, __le (incompatible with ProxifyLocals usage pattern)
 
 **Files Modified**:
-- `src/prometheus/steps/ProxifyLocals.lua` - Complete polymorphic metamethod implementation
+- `src/prometheus/steps/ProxifyLocals.lua` - Complete polymorphic metamethod implementation with bug fixes
 
-**Success Metric**: Metatable access patterns unrecognizable between files. ✅ **ACHIEVED** - Each variable now uses randomly selected metamethods from pool of 13-19 (depending on Lua version), with proper unary/binary handling.
+**Testing Verification**:
+- Tested with closures.lua, primes.lua, loops.lua
+- All tests produce identical output between original and obfuscated code
+- Verified proper function signature generation for unary metamethods
+- Confirmed Lua 5.1 compatibility (no __len or comparison operators used)
+
+**Success Metric**: Metatable access patterns unrecognizable between files. ✅ **ACHIEVED** - Each variable now uses randomly selected metamethods from pool of 9-16 (depending on Lua version), with proper unary/binary handling and verified correctness.
 
 ---
 
