@@ -1,0 +1,1 @@
+local function I(I)local function HKpCj48oFdKpCj4(I)for HKpCj48oFdKpCj4=2,math.sqrt(I),1 do if I%HKpCj48oFdKpCj4==0 then return false end end return true end for I=2,I,1 do if HKpCj48oFdKpCj4(I)then print(I)end end end I(20)

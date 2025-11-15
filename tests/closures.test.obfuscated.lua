@@ -1,0 +1,1 @@
+local D={}for Pl9Gdgramxl9Gdg=1,100,1 do local C C=(C or 1)+Pl9Gdgramxl9Gdg D[Pl9Gdgramxl9Gdg]=function()return C end end for D,Pl9Gdgramxl9Gdg in ipairs(D)do print(Pl9Gdgramxl9Gdg())end
