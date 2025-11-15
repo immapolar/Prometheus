@@ -15,6 +15,8 @@
 
 ✅ **Phase 6, Objective 6.2: Dynamic Name Length Distribution** - Name length distribution implemented and verified
 
+✅ **Phase 9, Objective 9.1: Statement Reordering** - Statement shuffling with dependency analysis implemented and verified
+
 ✅ **Phase 9, Objective 9.2: Dead Code Injection** - Dead code injection implemented and verified
 
 ✅ **Phase 10, Objective 10.2: Per-File Step Configuration Randomization** - Setting randomization with safe ranges implemented and verified
