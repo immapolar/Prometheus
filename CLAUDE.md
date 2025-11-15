@@ -95,7 +95,7 @@ If the answer to ANY of these is "no" or "maybe", **STOP and gather more informa
 
 ## Project Overview
 
-**Prometheus** is a Lua obfuscator written in pure Lua, inspired by the JavaScript obfuscator. It can obfuscate Lua 5.1 and Roblox's LuaU code through a configurable pipeline of obfuscation steps.
+**Prometheus** is a Lua obfuscator written in pure Lua, inspired by the JavaScript obfuscator. It can obfuscate Lua 5.1, Lua 5.4, Roblox's LuaU, and FiveM/CfxLua code through a configurable pipeline of obfuscation steps.
 
 - **Repository**: https://github.com/prometheus-lua/Prometheus
 - **Documentation**: https://levno-710.gitbook.io/prometheus/
@@ -171,7 +171,12 @@ Prometheus/
 │   ├── loops.lua
 │   ├── primes.lua
 │   ├── fibonacci.lua
-│   └── closures.lua
+│   ├── closures.lua
+│   ├── lua54_syntax.lua       # Lua 5.4 syntax tests
+│   ├── fivem_comprehensive.lua # FiveM/CfxLua comprehensive tests
+│   ├── fivem_vectors.lua      # Vector type tests
+│   ├── fivem_safe_navigation.lua # Safe navigation operator tests
+│   └── fivem_*.lua            # Additional FiveM test files
 ├── doc/                       # Documentation
 │   ├── README.md
 │   ├── SUMMARY.md
@@ -257,6 +262,10 @@ Predefined configurations for common use cases:
 | **Medium** | Balanced obfuscation | General use (optimized for FiveM) |
 | **Strong** | Maximum obfuscation | Heavy protection |
 | **Polar** | Custom preset | Custom configuration |
+| **Lua54** | Lua 5.4 preset with minimal obfuscation | Lua 5.4 scripts |
+| **Lua54Strong** | Lua 5.4 with heavy obfuscation | Protected Lua 5.4 scripts |
+| **FiveM** | Balanced obfuscation for FiveM/CfxLua | FiveM server scripts |
+| **FiveM_Strong** | Maximum obfuscation for FiveM/CfxLua | Sensitive FiveM code |
 
 ## Development Workflows
 
@@ -314,9 +323,10 @@ lua ./cli.lua --preset Medium ./your_file.lua
 ```
 
 **Command-Line Options**:
-- `--preset <name>` or `--p <name>`: Use a preset (Minify, Weak, Medium, Strong, Polar)
+- `--preset <name>` or `--p <name>`: Use a preset (Minify, Weak, Medium, Strong, Polar, Lua54, Lua54Strong, FiveM, FiveM_Strong)
 - `--config <file>` or `--c <file>`: Use custom config file
 - `--out <file>` or `--o <file>`: Specify output file
+- `--Lua54`: Target Lua 5.4 (includes FiveM/CfxLua extensions)
 - `--Lua51`: Target Lua 5.1
 - `--LuaU`: Target LuaU (Roblox)
 - `--pretty`: Enable pretty printing
@@ -378,11 +388,16 @@ package.path = oldPkgPath
 
 ### 4. Lua Version Support
 
-Two main targets:
-- **Lua51**: Standard Lua 5.1
-- **LuaU**: Roblox Luau (partial support)
+Three main targets, all fully supported:
+- **Lua54**: Lua 5.4 with full syntax support including:
+  - Floor division operator (`//`)
+  - Bitwise operators (`&`, `|`, `~`, `<<`, `>>`)
+  - Variable attributes (`<const>`, `<close>`)
+  - All FiveM/CfxLua extensions (see section below)
+- **Lua51**: Standard Lua 5.1 (most widely tested)
+- **LuaU**: Roblox Luau with compound operators
 
-Set via `LuaVersion` in config or `--Lua51`/`--LuaU` CLI flags.
+Set via `LuaVersion` in config or `--Lua51`/`--Lua54`/`--LuaU` CLI flags.
 
 ### 5. Math.random Fix
 
