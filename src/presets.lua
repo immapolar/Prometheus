@@ -5,22 +5,6 @@
 -- This Script Provides some configuration presets
 
 return {
-    ["Minify"] = {
-        -- The default LuaVersion is Lua51
-        LuaVersion = "Lua51";
-        -- For minifying no VarNamePrefix is applied
-        VarNamePrefix = "";
-        -- Name Generator for Variables
-        NameGenerator = "MangledShuffled";
-        -- No pretty printing
-        PrettyPrint = false;
-        -- Seed is generated based on current time
-        Seed = 0;
-        -- No obfuscation steps
-        Steps = {
-
-        }
-    };
     ["Weak"] = {
         -- The default LuaVersion is Lua51
         LuaVersion = "Lua51";
@@ -37,7 +21,7 @@ return {
             {
                 Name = "Vmify";
                 Settings = {
-                    
+
                 };
             },
             {
@@ -133,12 +117,6 @@ return {
         -- Obfuscation steps
         Steps = {
             {
-                Name = "Vmify";
-                Settings = {
-                    
-                };
-            },
-            {
                 Name = "EncryptStrings";
                 Settings = {
 
@@ -147,13 +125,13 @@ return {
             {
                 Name = "AntiTamper";
                 Settings = {
-
+                    UseDebug = false;  -- Set to false for Vmify compatibility
                 };
             },
             {
                 Name = "Vmify";
                 Settings = {
-                    
+
                 };
             },
             {
@@ -180,83 +158,14 @@ return {
             },
         }
     };
-    ["Polar"] = {
-        LuaVersion = "Lua51",
-        VarNamePrefix = "",  -- Empty prefix for smaller output
-        NameGenerator = "MangledShuffled",
-        PrettyPrint = false,
-        Seed = os.time(),
-        Steps = {
-            {
-                Name = "EncryptStrings",
-                Settings = {
-                    UseStrong = false,
-                    SimulateByteString = true,
-                    MinLength = 3
-                }
-            },
-            -- Single VM layer, positioned early
-            {
-                Name = "Vmify",
-                Settings = {
-                    MaximumVMs = 1,
-                    VirtualizeAll = false,
-                    ChunkSize = 3
-                }
-            },
-            {
-                Name = "ConstantArray",
-                Settings = {
-                    Treshold = 2,
-                    StringsOnly = true,
-                    Shuffle = true,
-                    Rotate = false,  -- Rotation can cause issues
-                    LocalWrapperTreshold = 1,
-                    MaxArraySize = 200
-                }
-            },
-            {
-                Name = "NumbersToExpressions",
-                Settings = {
-                    Treshold = 2,
-                    MaxDepth = 1,
-                    UseBitwise = false
-                }
-            },
-            -- AntiTamper after main obfuscation
-            {
-                Name = "AntiTamper",
-                Settings = {
-                    UseDebug = true,
-                    RandomSeed = true
-                }
-            },
-            {
-                Name = "WrapInFunction",
-                Settings = {
-                    Iterations = 1,
-                    LocalsCount = 2
-                }
-            }
-        }
-    };
     ["Lua54"] = {
-        -- Lua 5.4 minification preset for FiveM (2025+)
-        LuaVersion = "Lua54";
-        VarNamePrefix = "";
-        NameGenerator = "MangledShuffled";
-        PrettyPrint = false;
-        Seed = 0;
-        -- Minimal obfuscation for testing Lua 5.4 syntax
-        Steps = {}
-    };
-    ["Lua54Strong"] = {
-        -- Lua 5.4 with full obfuscation for FiveM (2025+)
+        -- Lua 5.4 medium-high strength preset with full obfuscation pipeline
         LuaVersion = "Lua54";
         VarNamePrefix = "";
         NameGenerator = "MangledShuffled";
         PrettyPrint = false;
         Seed = os.time();
+        -- Comprehensive obfuscation leveraging Lua 5.4 features
         Steps = {
             {
                 Name = "EncryptStrings";
@@ -267,22 +176,61 @@ return {
                 };
             },
             {
+                Name = "DeadCodeInjection";
+                Settings = {
+                    MinPercentage = 0.05;
+                    MaxPercentage = 0.15;
+                    MaxExpressionDepth = 3;
+                };
+            },
+            {
+                Name = "StatementShuffle";
+                Settings = {
+                    Enabled = true;
+                    MinGroupSize = 3;
+                    MaxGroupSize = 8;
+                };
+            },
+            {
+                Name = "AntiTamper";
+                Settings = {
+                    UseDebug = false;
+                    RandomSeed = true;
+                };
+            },
+            {
+                Name = "Vmify";
+                Settings = {
+                    MaximumVMs = 1;
+                    VirtualizeAll = false;
+                    ChunkSize = 3;
+                };
+            },
+            {
                 Name = "ConstantArray";
                 Settings = {
-                    Treshold = 1;
+                    Treshold = 0.7;
                     StringsOnly = true;
                     Shuffle = true;
                     Rotate = false;
-                    LocalWrapperTreshold = 0;
+                    LocalWrapperTreshold = 0.5;
                     MaxArraySize = 150;
                 };
             },
             {
                 Name = "NumbersToExpressions";
                 Settings = {
-                    Treshold = 1;
-                    MaxDepth = 1;
-                    UseBitwise = true;  -- Can use Lua 5.4 bitwise operators!
+                    Treshold = 0.8;
+                    MaxDepth = 2;
+                    UseBitwise = true;
+                };
+            },
+            {
+                Name = "SplitStrings";
+                Settings = {
+                    Treshold = 0.6;
+                    MinLength = 5;
+                    MaxLength = 8;
                 };
             },
             {
@@ -295,14 +243,14 @@ return {
         }
     };
     ["FiveM"] = {
-        -- FiveM uses Lua 5.4 with CfxLua extensions
+        -- FiveM uses Lua 5.4 with CfxLua extensions - High strength preset
         LuaVersion = "Lua54",
         VarNamePrefix = "",
         NameGenerator = "MangledShuffled",
         PrettyPrint = false,
         Seed = os.time(),
         RandomizeSettings = true, -- Enable polymorphic per-file setting variation
-        -- Optimized for FiveM scripts with all CfxLua features supported
+        -- High strength obfuscation for FiveM scripts with all CfxLua features supported
         Steps = {
             {
                 Name = "EncryptStrings";
@@ -313,53 +261,26 @@ return {
                 };
             },
             {
-                Name = "ConstantArray";
+                Name = "DeadCodeInjection";
                 Settings = {
-                    Treshold = 0.5;
-                    StringsOnly = true;
-                    Shuffle = true;
-                    Rotate = false;
-                    LocalWrapperTreshold = 0.5;
-                    MaxArraySize = 150;
+                    MinPercentage = 0.10;
+                    MaxPercentage = 0.25;
+                    MaxExpressionDepth = 4;
                 };
             },
             {
-                Name = "NumbersToExpressions";
+                Name = "StatementShuffle";
                 Settings = {
-                    Treshold = 1;
-                    MaxDepth = 2;
-                    UseBitwise = true;  -- Leverage Lua 5.4 bitwise operators
+                    Enabled = true;
+                    MinGroupSize = 2;
+                    MaxGroupSize = 10;
                 };
             },
             {
-                Name = "SplitStrings";
+                Name = "AntiTamper";
                 Settings = {
-                    Treshold = 0.5;
-                };
-            },
-            {
-                Name = "WrapInFunction";
-                Settings = {
-                    Iterations = 1;
-                };
-            },
-        }
-    };
-    ["FiveM_Strong"] = {
-        -- Stronger obfuscation for sensitive FiveM scripts
-        LuaVersion = "Lua54",
-        VarNamePrefix = "",
-        NameGenerator = "Il",  -- Confusing I/l names
-        PrettyPrint = false,
-        Seed = os.time(),
-        RandomizeSettings = true, -- Enable polymorphic per-file setting variation
-        Steps = {
-            {
-                Name = "EncryptStrings";
-                Settings = {
-                    UseStrong = true;  -- Stronger encryption
-                    SimulateByteString = true;
-                    MinLength = 2;
+                    UseDebug = false;
+                    RandomSeed = true;
                 };
             },
             {
@@ -367,38 +288,39 @@ return {
                 Settings = {
                     MaximumVMs = 1;
                     VirtualizeAll = false;
-                    ChunkSize = 4;
+                    ChunkSize = 3;
                 };
             },
             {
                 Name = "ConstantArray";
                 Settings = {
                     Treshold = 0.8;
-                    StringsOnly = false;  -- Include numbers
+                    StringsOnly = true;
                     Shuffle = true;
-                    Rotate = true;
-                    LocalWrapperTreshold = 0.8;
-                    MaxArraySize = 100;
+                    Rotate = false;
+                    LocalWrapperTreshold = 0.7;
+                    MaxArraySize = 200;
                 };
             },
             {
                 Name = "NumbersToExpressions";
                 Settings = {
-                    Treshold = 0.8;
+                    Treshold = 1;
                     MaxDepth = 3;
-                    UseBitwise = true;
-                };
-            },
-            {
-                Name = "ProxifyLocals";
-                Settings = {
-                    Treshold = 0.6;
+                    UseBitwise = true;  -- Leverage Lua 5.4 bitwise operators
                 };
             },
             {
                 Name = "SplitStrings";
                 Settings = {
-                    Treshold = 0.7;
+                    Treshold = 0.8;
+                    MinLength = 4;
+                    MaxLength = 10;
+                };
+            },
+            {
+                Name = "AddVararg";
+                Settings = {
                 };
             },
             {
@@ -406,6 +328,96 @@ return {
                 Settings = {
                     Iterations = 2;
                     LocalsCount = 3;
+                };
+            },
+        }
+    };
+    ["Polar"] = {
+        -- Very high strength preset optimized for Lua 5.4 and FiveM
+        LuaVersion = "Lua54",
+        VarNamePrefix = "",
+        NameGenerator = "MangledShuffled",
+        PrettyPrint = false,
+        Seed = os.time(),
+        RandomizeSettings = true, -- Enable polymorphic per-file setting variation
+        -- Maximum obfuscation with all layers applied for FiveM/Lua 5.4 compatibility
+        Steps = {
+            {
+                Name = "EncryptStrings";
+                Settings = {
+                    UseStrong = true;
+                    SimulateByteString = true;
+                    MinLength = 2;
+                };
+            },
+            {
+                Name = "DeadCodeInjection";
+                Settings = {
+                    MinPercentage = 0.15;
+                    MaxPercentage = 0.30;
+                    MaxExpressionDepth = 5;
+                };
+            },
+            {
+                Name = "StatementShuffle";
+                Settings = {
+                    Enabled = true;
+                    MinGroupSize = 2;
+                    MaxGroupSize = 12;
+                };
+            },
+            {
+                Name = "AntiTamper";
+                Settings = {
+                    UseDebug = false;
+                    RandomSeed = true;
+                };
+            },
+            {
+                Name = "Vmify";
+                Settings = {
+                    MaximumVMs = 1;
+                    VirtualizeAll = false;
+                    ChunkSize = 3;
+                };
+            },
+            {
+                Name = "ConstantArray";
+                Settings = {
+                    Treshold = 0.9;
+                    StringsOnly = true;
+                    Shuffle = true;
+                    Rotate = false;
+                    LocalWrapperTreshold = 0.8;
+                    MaxArraySize = 250;
+                };
+            },
+            {
+                Name = "NumbersToExpressions";
+                Settings = {
+                    Treshold = 1;
+                    MaxDepth = 3;
+                    UseBitwise = true;
+                };
+            },
+            {
+                Name = "SplitStrings";
+                Settings = {
+                    Treshold = 0.9;
+                    MinLength = 3;
+                    MaxLength = 12;
+                };
+            },
+            {
+                Name = "AddVararg";
+                Settings = {
+                };
+            },
+            {
+                Name = "WrapInFunction";
+                Settings = {
+                    Iterations = 3;
+                    LocalsCount = 4;
                 };
             },
         }
