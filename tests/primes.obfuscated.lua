@@ -1,0 +1,1 @@
+local function r(r)local function UxrHaA7b_4xrHaA(r)for UxrHaA7b_4xrHaA=2,math.sqrt(r),1 do if r%UxrHaA7b_4xrHaA==0 then return false end end return true end for r=2,r,1 do if UxrHaA7b_4xrHaA(r)then print(r)end end end r(20)
