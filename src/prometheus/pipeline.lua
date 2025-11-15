@@ -242,13 +242,51 @@ function Pipeline:setNameGenerator(nameGenerator)
 	if(type(nameGenerator) == "string") then
 		nameGenerator = Pipeline.NameGenerators[nameGenerator];
 	end
-	
+
 	if(type(nameGenerator) == "function" or type(nameGenerator) == "table") then
 		self.namegenerator = nameGenerator;
 		return;
 	else
 		logger:error("The Argument to Pipeline:setNameGenerator must be a valid NameGenerator function or function name e.g: \"mangled\"")
 	end
+end
+
+-- Phase 6, Objective 6.2: Generate Dynamic Name Length Distribution
+-- Generates random length distribution for polymorphic variable name generation
+-- Returns a table with length categories, weights, and ranges
+function Pipeline:generateLengthDistribution()
+	-- Define length categories and their ranges
+	local categories = { "short", "medium", "long", "veryLong" };
+	local ranges = {
+		short    = { min = 1,  max = 3  };
+		medium   = { min = 4,  max = 8  };
+		long     = { min = 9,  max = 20 };
+		veryLong = { min = 21, max = 50 };
+	};
+
+	-- Generate random weights for each category
+	local weights = {};
+	local sum = 0;
+	for i = 1, #categories do
+		local weight = math.random();
+		weights[i] = weight;
+		sum = sum + weight;
+	end
+
+	-- Normalize weights to sum to 1.0
+	for i = 1, #categories do
+		weights[i] = weights[i] / sum;
+	end
+
+	-- Log the generated distribution for debugging
+	logger:info(string.format("Name Length Distribution: short=%.1f%% medium=%.1f%% long=%.1f%% veryLong=%.1f%%",
+		weights[1] * 100, weights[2] * 100, weights[3] * 100, weights[4] * 100));
+
+	return {
+		categories = categories;
+		weights = weights;
+		ranges = ranges;
+	};
 end
 
 function Pipeline:apply(code, filename)
@@ -314,12 +352,15 @@ end
 function Pipeline:renameVariables(ast)
 	local startTime = gettime();
 	logger:info("Renaming Variables ...");
-	
-	
+
+	-- Phase 6, Objective 6.2: Dynamic Name Length Distribution
+	-- Generate random length distribution per file for polymorphic name generation
+	local lengthDistribution = self:generateLengthDistribution();
+
 	local generatorFunction = self.namegenerator or Pipeline.NameGenerators.mangled;
 	if(type(generatorFunction) == "table") then
 		if (type(generatorFunction.prepare) == "function") then
-			generatorFunction.prepare(ast);
+			generatorFunction.prepare(ast, lengthDistribution);
 		end
 		generatorFunction = generatorFunction.generateName;
 	end
