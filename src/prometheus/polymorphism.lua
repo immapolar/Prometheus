@@ -10,6 +10,7 @@
 
 local logger = require("logger");
 local util = require("prometheus.util");
+local bit32 = require("prometheus.bit").bit32;
 
 local Polymorphism = {};
 
@@ -132,7 +133,7 @@ function Polymorphism:selectVariant(stepName)
 	-- Deterministic selection using entropy
 	-- Mix step name into entropy for per-step variation
 	local stepHash = util.jenkinsHash(stepName);
-	local combinedEntropy = (self.entropyState or 0) ~ stepHash;
+	local combinedEntropy = bit32.bxor(self.entropyState or 0, stepHash);
 
 	-- Select variant using modulo (deterministic but appears random)
 	local index = (combinedEntropy % #variantArray) + 1;
