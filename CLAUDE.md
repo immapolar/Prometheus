@@ -125,6 +125,12 @@ Prometheus/
 ├── cli.lua                    # CLI entry point (delegates to src/cli.lua)
 ├── tests.lua                  # Test suite entry point
 ├── prometheus-main.lua        # Main module entry point
+├── benchmark.lua              # Performance benchmark script
+├── readme.md                  # Project README
+├── CLAUDE.md                  # AI assistant guide (this file)
+├── CFXLUA_LANGUAGE_EXTENSIONS.md  # FiveM/CfxLua language extensions documentation
+├── FIVEM_IMPLEMENTATION_SUMMARY.md # FiveM implementation summary
+├── UNIQUENESS_ROADMAP.md      # Polymorphic obfuscation roadmap
 ├── src/
 │   ├── prometheus.lua         # Main module exports
 │   ├── cli.lua               # CLI implementation
@@ -145,8 +151,11 @@ Prometheus/
 │       ├── enums.lua          # Enumerations and constants
 │       ├── bit.lua            # Bitwise operations polyfill
 │       ├── step.lua           # Base class for obfuscation steps
+│       ├── steps.lua          # Exports all obfuscation steps
 │       ├── randomLiterals.lua # Random literal generation
 │       ├── randomStrings.lua  # Random string generation
+│       ├── entropy.lua        # High-entropy seed generation for polymorphic obfuscation
+│       ├── namegenerators.lua # Exports all name generators
 │       ├── namegenerators/    # Variable name generators
 │       │   ├── mangled.lua
 │       │   ├── mangled_shuffled.lua
@@ -168,15 +177,19 @@ Prometheus/
 │       └── compiler/
 │           └── compiler.lua   # Lua bytecode compiler (for Vmify)
 ├── tests/                     # Test Lua scripts
-│   ├── loops.lua
-│   ├── primes.lua
-│   ├── fibonacci.lua
-│   ├── closures.lua
+│   ├── loops.lua              # Loop constructs test
+│   ├── primes.lua             # Prime number calculation test
+│   ├── fibonacci.lua          # Fibonacci sequence test
+│   ├── closures.lua           # Closure functionality test
 │   ├── lua54_syntax.lua       # Lua 5.4 syntax tests
 │   ├── fivem_comprehensive.lua # FiveM/CfxLua comprehensive tests
 │   ├── fivem_vectors.lua      # Vector type tests
 │   ├── fivem_safe_navigation.lua # Safe navigation operator tests
-│   └── fivem_*.lua            # Additional FiveM test files
+│   ├── fivem_defer.lua        # Citizen.Wait/Defer tests
+│   ├── fivem_phase1.lua       # FiveM Phase 1 features
+│   ├── fivem_phase4_sugar.lua # FiveM Phase 4 syntactic sugar
+│   ├── fivem_production.lua   # FiveM production code test
+│   └── *.obfuscated.lua       # Obfuscated test outputs
 ├── doc/                       # Documentation
 │   ├── README.md
 │   ├── SUMMARY.md
@@ -266,6 +279,28 @@ Predefined configurations for common use cases:
 | **Lua54Strong** | Lua 5.4 with heavy obfuscation | Protected Lua 5.4 scripts |
 | **FiveM** | Balanced obfuscation for FiveM/CfxLua | FiveM server scripts |
 | **FiveM_Strong** | Maximum obfuscation for FiveM/CfxLua | Sensitive FiveM code |
+
+### 6. Entropy and Polymorphic Obfuscation
+
+**Key File**: `src/prometheus/entropy.lua`
+
+The entropy module provides high-entropy seed generation for polymorphic obfuscation, ensuring that the same source code produces different obfuscated output on each execution (when userSeed <= 0).
+
+**Entropy Sources**:
+- **Content Hash**: Hash of source code (file-specific)
+- **Filename Hash**: Hash of filename (additional file-specific entropy)
+- **Timestamp**: High-resolution timestamp (ensures uniqueness per execution)
+- **User Seed**: Optional user-specified seed for reproducible builds
+
+**Behavior**:
+- When `userSeed > 0`: Produces reproducible output (same file + same seed = same output)
+- When `userSeed <= 0`: Produces polymorphic output (unique per execution)
+
+**Key Functions**:
+- `Entropy.generateSeed(sourceCode, filename, userSeed)`: Generate high-entropy seed
+- `Entropy.getEntropyStats(sourceCode, filename)`: Get entropy statistics for debugging
+
+This implements Phase 1, Objective 1.1 of the Uniqueness Roadmap for polymorphic obfuscation.
 
 ## Development Workflows
 
@@ -630,17 +665,6 @@ Before committing changes:
 - Vmify step is very slow (compiles to bytecode)
 - ConstantArray with large thresholds increases memory usage
 - Consider file size impact of obfuscation steps
-
-### Git Workflow for This Session
-
-**Current Branch**: `claude/claude-md-mhyl6hvcvyydr01i-01981fXRvL4yyXhgW1eGhnLK`
-
-When ready to commit:
-```bash
-git add CLAUDE.md
-git commit -m "Add comprehensive CLAUDE.md documentation for AI assistants"
-git push -u origin claude/claude-md-mhyl6hvcvyydr01i-01981fXRvL4yyXhgW1eGhnLK
-```
 
 ## Resources
 
