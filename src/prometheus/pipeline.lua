@@ -13,6 +13,7 @@ local Parser = require("prometheus.parser");
 local Unparser = require("prometheus.unparser");
 local logger = require("logger");
 local Entropy = require("prometheus.entropy");
+local Polymorphism = require("prometheus.polymorphism");
 
 local NameGenerators = require("prometheus.namegenerators");
 
@@ -75,6 +76,9 @@ function Pipeline:new(settings)
 		namegenerator = Pipeline.NameGenerators.MangledShuffled;
 		conventions = conventions;
 		steps = {};
+		-- Phase 1, Objective 1.2: Algorithm Randomization Framework
+		-- Initialize polymorphism context for variant-based obfuscation
+		polymorphism = Polymorphism:new();
 	}
 	
 	setmetatable(pipeline, self);
@@ -299,6 +303,11 @@ function Pipeline:apply(code, filename)
 	-- while maintaining reproducibility when user specifies a seed > 0
 	local entropySeed = Entropy.generateSeed(code, filename, self.Seed);
 	math.randomseed(entropySeed);
+
+	-- Phase 1, Objective 1.2: Set entropy for polymorphic variant selection
+	-- This enables deterministic per-file variant selection while maintaining uniqueness
+	self.polymorphism:reset();
+	self.polymorphism:setEntropy(entropySeed);
 
 	-- Apply setting randomization after entropy seeding
 	-- This ensures each file gets unique randomization based on its entropy
