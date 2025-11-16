@@ -216,6 +216,53 @@ return {
             },
         }
     };
+    ["Phase51TestStrongExact"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;  -- Fixed seed instead of 0
+        Steps = {
+            {
+                Name = "EncryptStrings";
+                Settings = {};
+            },
+            {
+                Name = "AntiTamper";
+                Settings = {
+                    UseDebug = false;
+                };
+            },
+            {
+                Name = "Vmify";
+                Settings = {};
+            },
+            {
+                Name = "ConstantArray";
+                Settings = {
+                    Treshold = 1;
+                    StringsOnly = true;
+                    Shuffle = true;
+                    Rotate = true;
+                    LocalWrapperTreshold = 0;
+                };
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "any";  -- Same as Strong
+                };
+            },
+            {
+                Name = "NumbersToExpressions";
+                Settings = {};
+            },
+            {
+                Name = "WrapInFunction";
+                Settings = {};
+            },
+        }
+    };
     ["Weak"] = {
         -- The default LuaVersion is Lua51
         LuaVersion = "Lua51";
