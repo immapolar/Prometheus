@@ -5,6 +5,22 @@
 -- This Script Provides some configuration presets
 
 return {
+    ["Phase51Test"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 0;
+        Steps = {
+            {
+                Name = "NumbersToExpressions";
+                Settings = {
+                    Treshold = 1;
+                    InternalTreshold = 0.2;
+                };
+            },
+        }
+    };
     ["Weak"] = {
         -- The default LuaVersion is Lua51
         LuaVersion = "Lua51";
