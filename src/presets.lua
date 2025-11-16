@@ -387,6 +387,12 @@ return {
                 };
             },
             {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                }
+            },
+            {
                 Name = "Vmify";
                 Settings = {
 
@@ -400,12 +406,6 @@ return {
                     Shuffle     = true;
                     Rotate      = true;
                     LocalWrapperTreshold = 0;
-                }
-            },
-            {
-                Name = "ProxifyLocals";
-                Settings = {
-                    LiteralType = "number";  -- Changed from "any" to "number" for compatibility
                 }
             },
             {
