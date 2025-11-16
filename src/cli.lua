@@ -44,6 +44,7 @@ local sourceFile;
 local outFile;
 local luaVersion;
 local prettyPrint;
+local seedOverride;
 
 Prometheus.colors.enabled = true;
 
@@ -93,14 +94,20 @@ while i <= #arg do
             luaVersion = "Lua54";
         elseif curr == "--pretty" then
             prettyPrint = true;
+        elseif curr == "--seed" or curr == "--s" then
+            i = i + 1;
+            seedOverride = tonumber(arg[i]);
+            if not seedOverride then
+                Prometheus.Logger:error(string.format("Invalid seed value \"%s\". Seed must be a number.", tostring(arg[i])));
+            end
         elseif curr == "--saveerrors" then
             -- Override error callback
             Prometheus.Logger.errorCallback =  function(...)
                 print(Prometheus.colors(Prometheus.Config.NameUpper .. ": " .. ..., "red"))
-                
+
                 local args = {...};
                 local message = table.concat(args, " ");
-                
+
                 local fileName = sourceFile:sub(-4) == ".lua" and sourceFile:sub(0, -5) .. ".error.txt" or sourceFile .. ".error.txt";
                 local handle = io.open(fileName, "w");
                 handle:write(message);
@@ -129,9 +136,10 @@ if not config then
     config = Prometheus.Presets.Minify;
 end
 
--- Add Option to override Lua Version
+-- Add Options to override config settings
 config.LuaVersion = luaVersion or config.LuaVersion;
 config.PrettyPrint = prettyPrint ~= nil and prettyPrint or config.PrettyPrint;
+config.Seed = seedOverride or config.Seed;
 
 if not file_exists(sourceFile) then
     Prometheus.Logger:error(string.format("The File \"%s\" was not found!", sourceFile));
