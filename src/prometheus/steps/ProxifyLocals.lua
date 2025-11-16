@@ -172,15 +172,17 @@ function ProifyLocals:init(settings)
 	
 end
 
--- Phase 7, Objective 7.1: Dynamic Metamethod Selection
--- Generates random metamethod selection for a proxified variable
+-- Phase 7, Objective 7.1 & 7.2: Dynamic Metamethod Selection with Nested Proxy Chains
+-- Generates random metamethod selection for a proxified variable with 1-4 nesting levels
 -- Filters metamethods by Lua version and separates unary/binary operations
 -- setValue requires binary operations, getValue can use binary or unary
+-- Returns array of info objects (one per nesting level)
 local function generateLocalMetatableInfo(pipeline)
-    local usedOps = {};
-    local info = {};
+    -- Phase 7.2: Random nesting depth (1-4 levels)
+    local nestingDepth = math.random(1, 4);
+    local infos = {};
 
-    -- Filter metamethods by Lua version compatibility
+    -- Filter metamethods by Lua version compatibility (done once for all levels)
     local availableMetamethods = {};
     for i, metamethod in ipairs(MetatableExpressions) do
         -- Include if no luaVersion restriction OR matches current Lua version
@@ -189,7 +191,7 @@ local function generateLocalMetatableInfo(pipeline)
         end
     end
 
-    -- Separate binary and unary operations
+    -- Separate binary and unary operations (done once for all levels)
     local binaryOps = {};
     local unaryOps = {};
     for i, metamethod in ipairs(availableMetamethods) do
@@ -200,100 +202,222 @@ local function generateLocalMetatableInfo(pipeline)
         end
     end
 
-    -- setValue: Must use binary operation (requires 2 arguments)
-    local setValueOp;
-    repeat
-        setValueOp = binaryOps[math.random(#binaryOps)];
-    until not usedOps[setValueOp];
-    usedOps[setValueOp] = true;
-    info.setValue = setValueOp;
+    -- Generate info for each nesting level
+    for level = 1, nestingDepth do
+        local usedOps = {};  -- Separate tracking per level
+        local info = {};
 
-    -- getValue: Can use binary OR unary operation
-    local getValueOp;
-    repeat
-        getValueOp = availableMetamethods[math.random(#availableMetamethods)];
-    until not usedOps[getValueOp];
-    usedOps[getValueOp] = true;
-    info.getValue = getValueOp;
+        -- setValue: Must use binary operation (requires 2 arguments)
+        local setValueOp;
+        repeat
+            setValueOp = binaryOps[math.random(#binaryOps)];
+        until not usedOps[setValueOp];
+        usedOps[setValueOp] = true;
+        info.setValue = setValueOp;
 
-    -- index: Reserved for future use (currently unused in assignment flow)
-    -- Select from remaining operations
-    local indexOp;
-    repeat
-        indexOp = availableMetamethods[math.random(#availableMetamethods)];
-    until not usedOps[indexOp];
-    usedOps[indexOp] = true;
-    info.index = indexOp;
+        -- getValue: Can use binary OR unary operation
+        local getValueOp;
+        repeat
+            getValueOp = availableMetamethods[math.random(#availableMetamethods)];
+        until not usedOps[getValueOp];
+        usedOps[getValueOp] = true;
+        info.getValue = getValueOp;
 
-    info.valueName = callNameGenerator(pipeline.namegenerator, math.random(1, 4096));
+        -- index: Reserved for future use (currently unused in assignment flow)
+        -- Select from remaining operations
+        local indexOp;
+        repeat
+            indexOp = availableMetamethods[math.random(#availableMetamethods)];
+        until not usedOps[indexOp];
+        usedOps[indexOp] = true;
+        info.index = indexOp;
 
-    return info;
+        -- Generate unique valueName per level
+        info.valueName = callNameGenerator(pipeline.namegenerator, math.random(1, 4096));
+        info.level = level;
+
+        table.insert(infos, info);
+    end
+
+    return infos;  -- Return ARRAY of info objects
 end
 
-function ProifyLocals:CreateAssignmentExpression(info, expr, parentScope)
-    local metatableVals = {};
+-- Phase 7.2: Helper function to get index expression with __index awareness
+-- Prevents infinite recursion when __index is used as a metamethod
+function ProifyLocals:getIndexExpression(scope, selfVar, info)
+    -- If __index is used as setValue or getValue, use rawget to avoid recursion
+    if info.getValue.key == "__index" or info.setValue.key == "__index" then
+        return Ast.FunctionCallExpression(
+            Ast.VariableExpression(scope:resolveGlobal("rawget")),
+            {
+                Ast.VariableExpression(scope, selfVar),
+                Ast.StringExpression(info.valueName)
+            }
+        );
+    else
+        return Ast.IndexExpression(
+            Ast.VariableExpression(scope, selfVar),
+            Ast.StringExpression(info.valueName)
+        );
+    end
+end
 
-    -- Setvalue Entry
+-- Phase 7.2: Helper function to create setValue metamethod function for one proxy level
+-- For innermost level: directly sets the value
+-- For outer levels: chains to inner level's setValue through metamethod operation
+function ProifyLocals:createSetValueFunction(info, isInnermost, parentScope, pipeline)
     local setValueFunctionScope = Scope:new(parentScope);
     local setValueSelf = setValueFunctionScope:addVariable();
     local setValueArg = setValueFunctionScope:addVariable();
-    local setvalueFunctionLiteral = Ast.FunctionLiteralExpression(
-        {
-            Ast.VariableExpression(setValueFunctionScope, setValueSelf), -- Argument 1
-            Ast.VariableExpression(setValueFunctionScope, setValueArg), -- Argument 2
-        },
-        Ast.Block({ -- Create Function Body
+
+    local functionBody;
+
+    if isInnermost then
+        -- Level 1: Directly set the value
+        -- function(self, arg) self[valueName] = arg end
+        functionBody = Ast.Block({
             Ast.AssignmentStatement({
-                Ast.AssignmentIndexing(Ast.VariableExpression(setValueFunctionScope, setValueSelf), Ast.StringExpression(info.valueName));
+                Ast.AssignmentIndexing(
+                    Ast.VariableExpression(setValueFunctionScope, setValueSelf),
+                    Ast.StringExpression(info.valueName)
+                )
             }, {
                 Ast.VariableExpression(setValueFunctionScope, setValueArg)
             })
-        }, setValueFunctionScope)
-    );
-    table.insert(metatableVals, Ast.KeyedTableEntry(Ast.StringExpression(info.setValue.key), setvalueFunctionLiteral));
+        }, setValueFunctionScope);
+    else
+        -- Level 2+: Chain to inner level's setValue
+        -- function(self, arg) emptyFunc(self[valueName] <setValue.op> arg) end
+        local indexExpr = self:getIndexExpression(
+            setValueFunctionScope,
+            setValueSelf,
+            info
+        );
 
-    -- Getvalue Entry
+        local chainExpr = info.setValue.constructor(
+            indexExpr,
+            Ast.VariableExpression(setValueFunctionScope, setValueArg)
+        );
+
+        setValueFunctionScope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
+        self.emptyFunctionUsed = true;
+
+        functionBody = Ast.Block({
+            Ast.FunctionCallStatement(
+                Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId),
+                {chainExpr}
+            )
+        }, setValueFunctionScope);
+    end
+
+    return Ast.FunctionLiteralExpression({
+        Ast.VariableExpression(setValueFunctionScope, setValueSelf),
+        Ast.VariableExpression(setValueFunctionScope, setValueArg)
+    }, functionBody);
+end
+
+-- Phase 7.2: Helper function to create getValue metamethod function for one proxy level
+-- For innermost level: directly returns the value
+-- For outer levels: chains to inner level's getValue through metamethod operation
+function ProifyLocals:createGetValueFunction(info, isInnermost, parentScope, pipeline)
     local getValueFunctionScope = Scope:new(parentScope);
     local getValueSelf = getValueFunctionScope:addVariable();
     local getValueArg = nil;
 
-    -- Phase 7.1: Unary metamethods only take one argument (self)
-    local getValueArgs = { Ast.VariableExpression(getValueFunctionScope, getValueSelf) };
+    -- Build argument list (unary vs binary)
+    local getValueArgs = {Ast.VariableExpression(getValueFunctionScope, getValueSelf)};
     if not info.getValue.isUnary then
         -- Binary metamethods take two arguments (self, arg)
         getValueArg = getValueFunctionScope:addVariable();
         table.insert(getValueArgs, Ast.VariableExpression(getValueFunctionScope, getValueArg));
     end
 
-    local getValueIdxExpr;
-    if(info.getValue.key == "__index" or info.setValue.key == "__index") then
-        getValueIdxExpr = Ast.FunctionCallExpression(Ast.VariableExpression(getValueFunctionScope:resolveGlobal("rawget")), {
-            Ast.VariableExpression(getValueFunctionScope, getValueSelf),
-            Ast.StringExpression(info.valueName),
-        });
+    local returnExpr;
+
+    if isInnermost then
+        -- Level 1: Directly return the value
+        -- function(self) return self[valueName] end (or with arg if binary)
+        returnExpr = self:getIndexExpression(
+            getValueFunctionScope,
+            getValueSelf,
+            info
+        );
     else
-        getValueIdxExpr = Ast.IndexExpression(Ast.VariableExpression(getValueFunctionScope, getValueSelf), Ast.StringExpression(info.valueName));
+        -- Level 2+: Chain to inner level's getValue
+        -- function(self, arg) return self[valueName] <getValue.op> <literal> end
+        local indexExpr = self:getIndexExpression(
+            getValueFunctionScope,
+            getValueSelf,
+            info
+        );
+
+        if info.getValue.isUnary then
+            -- Unary: just apply operation to inner proxy
+            returnExpr = info.getValue.constructor(indexExpr);
+        else
+            -- Binary: apply operation with random literal
+            local literal;
+            if self.LiteralType == "dictionary" then
+                literal = RandomLiterals.Dictionary();
+            elseif self.LiteralType == "number" then
+                literal = RandomLiterals.Number();
+            elseif self.LiteralType == "string" then
+                literal = RandomLiterals.String(pipeline);
+            else
+                literal = RandomLiterals.Any(pipeline);
+            end
+            returnExpr = info.getValue.constructor(indexExpr, literal);
+        end
     end
-    local getvalueFunctionLiteral = Ast.FunctionLiteralExpression(
+
+    return Ast.FunctionLiteralExpression(
         getValueArgs,
-        Ast.Block({ -- Create Function Body
-            Ast.ReturnStatement({
-                getValueIdxExpr;
-            });
+        Ast.Block({
+            Ast.ReturnStatement({returnExpr})
         }, getValueFunctionScope)
     );
-    table.insert(metatableVals, Ast.KeyedTableEntry(Ast.StringExpression(info.getValue.key), getvalueFunctionLiteral));
+end
 
-    parentScope:addReferenceToHigherScope(self.setMetatableVarScope, self.setMetatableVarId);
-    return Ast.FunctionCallExpression(
-        Ast.VariableExpression(self.setMetatableVarScope, self.setMetatableVarId),
-        {
-            Ast.TableConstructorExpression({
-                Ast.KeyedTableEntry(Ast.StringExpression(info.valueName), expr)
-            }),
-            Ast.TableConstructorExpression(metatableVals)
-        }
-    );
+-- Phase 7.2: Create nested proxy chain wrapping expression in 1-4 levels
+-- Wraps from innermost to outermost, each level using different metamethods
+function ProifyLocals:CreateAssignmentExpression(infos, expr, parentScope, pipeline)
+    -- Wrap from innermost to outermost
+    local currentExpr = expr;
+
+    for level = 1, #infos do
+        local info = infos[level];
+        local isInnermost = (level == 1);
+
+        local metatableVals = {};
+
+        -- Create setValue function for this level
+        local setValueFunc = self:createSetValueFunction(info, isInnermost, parentScope, pipeline);
+        table.insert(metatableVals, Ast.KeyedTableEntry(
+            Ast.StringExpression(info.setValue.key),
+            setValueFunc
+        ));
+
+        -- Create getValue function for this level
+        local getValueFunc = self:createGetValueFunction(info, isInnermost, parentScope, pipeline);
+        table.insert(metatableVals, Ast.KeyedTableEntry(
+            Ast.StringExpression(info.getValue.key),
+            getValueFunc
+        ));
+
+        -- Wrap currentExpr in this level's proxy
+        parentScope:addReferenceToHigherScope(self.setMetatableVarScope, self.setMetatableVarId);
+        currentExpr = Ast.FunctionCallExpression(
+            Ast.VariableExpression(self.setMetatableVarScope, self.setMetatableVarId),
+            {
+                Ast.TableConstructorExpression({
+                    Ast.KeyedTableEntry(Ast.StringExpression(info.valueName), currentExpr)
+                }),
+                Ast.TableConstructorExpression(metatableVals)
+            }
+        );
+    end
+
+    return currentExpr;  -- Return outermost proxy
 end
 
 function ProifyLocals:apply(ast, pipeline)
@@ -310,9 +434,10 @@ function ProifyLocals:apply(ast, pipeline)
             end
             return localMetatableInfos[scope][id];
         end
-        local localMetatableInfo = generateLocalMetatableInfo(pipeline);
-        localMetatableInfos[scope][id] = localMetatableInfo;
-        return localMetatableInfo;
+        -- Phase 7.2: generateLocalMetatableInfo now returns ARRAY of infos
+        local localMetatableInfos_array = generateLocalMetatableInfo(pipeline);
+        localMetatableInfos[scope][id] = localMetatableInfos_array;
+        return localMetatableInfos_array;
     end
 
     local function disableMetatableInfo(scope, id)
@@ -362,12 +487,14 @@ function ProifyLocals:apply(ast, pipeline)
         if(node.kind == AstKind.AssignmentStatement) then
             if(#node.lhs == 1 and node.lhs[1].kind == AstKind.AssignmentVariable) then
                 local variable = node.lhs[1];
-                local localMetatableInfo = getLocalMetatableInfo(variable.scope, variable.id);
-                if localMetatableInfo then
+                local localMetatableInfos_array = getLocalMetatableInfo(variable.scope, variable.id);
+                if localMetatableInfos_array then
+                    -- Phase 7.2: Use OUTERMOST level's setValue (last in array)
+                    local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
                     local args = shallowcopy(node.rhs);
                     local vexp = Ast.VariableExpression(variable.scope, variable.id);
                     vexp.__ignoreProxifyLocals = true;
-                    args[1] = localMetatableInfo.setValue.constructor(vexp, args[1]);
+                    args[1] = outermostInfo.setValue.constructor(vexp, args[1]);
                     self.emptyFunctionUsed = true;
                     data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
                     return Ast.FunctionCallStatement(Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId), args);
@@ -379,10 +506,11 @@ function ProifyLocals:apply(ast, pipeline)
         if(node.kind == AstKind.LocalVariableDeclaration) then
             for i, id in ipairs(node.ids) do
                 local expr = node.expressions[i] or Ast.NilExpression();
-                local localMetatableInfo = getLocalMetatableInfo(node.scope, id);
+                local localMetatableInfos_array = getLocalMetatableInfo(node.scope, id);
                 -- Apply Only to Some Variables if Treshold is non 1
-                if localMetatableInfo then
-                    local newExpr = self:CreateAssignmentExpression(localMetatableInfo, expr, node.scope);
+                if localMetatableInfos_array then
+                    -- Phase 7.2: Pass array and pipeline to CreateAssignmentExpression
+                    local newExpr = self:CreateAssignmentExpression(localMetatableInfos_array, expr, node.scope, pipeline);
                     node.expressions[i] = newExpr;
                 end
             end
@@ -390,13 +518,15 @@ function ProifyLocals:apply(ast, pipeline)
 
         -- Variable Expression
         if(node.kind == AstKind.VariableExpression and not node.__ignoreProxifyLocals) then
-            local localMetatableInfo = getLocalMetatableInfo(node.scope, node.id);
+            local localMetatableInfos_array = getLocalMetatableInfo(node.scope, node.id);
             -- Apply Only to Some Variables if Treshold is non 1
-            if localMetatableInfo then
-                -- Phase 7, Objective 7.1: Handle unary vs binary getValue operations
-                if localMetatableInfo.getValue.isUnary then
+            if localMetatableInfos_array then
+                -- Phase 7.2: Use OUTERMOST level's getValue (last in array)
+                local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
+                -- Phase 7.1 & 7.2: Handle unary vs binary getValue operations
+                if outermostInfo.getValue.isUnary then
                     -- Unary operation: only pass the node (e.g., __unm, __bnot, __len)
-                    return localMetatableInfo.getValue.constructor(node);
+                    return outermostInfo.getValue.constructor(node);
                 else
                     -- Binary operation: pass node and literal (e.g., __add, __sub, etc.)
                     local literal;
@@ -409,36 +539,41 @@ function ProifyLocals:apply(ast, pipeline)
                     else
                         literal = RandomLiterals.Any(pipeline);
                     end
-                    return localMetatableInfo.getValue.constructor(node, literal);
+                    return outermostInfo.getValue.constructor(node, literal);
                 end
             end
         end
 
         -- Assignment Variable for Assignment Statement
         if(node.kind == AstKind.AssignmentVariable) then
-            local localMetatableInfo = getLocalMetatableInfo(node.scope, node.id);
+            local localMetatableInfos_array = getLocalMetatableInfo(node.scope, node.id);
             -- Apply Only to Some Variables if Treshold is non 1
-            if localMetatableInfo then
-                return Ast.AssignmentIndexing(node, Ast.StringExpression(localMetatableInfo.valueName));
+            if localMetatableInfos_array then
+                -- Phase 7.2: Use OUTERMOST level's valueName (last in array)
+                local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
+                return Ast.AssignmentIndexing(node, Ast.StringExpression(outermostInfo.valueName));
             end
         end
 
         -- Local Function Declaration
         if(node.kind == AstKind.LocalFunctionDeclaration) then
-            local localMetatableInfo = getLocalMetatableInfo(node.scope, node.id);
+            local localMetatableInfos_array = getLocalMetatableInfo(node.scope, node.id);
             -- Apply Only to Some Variables if Treshold is non 1
-            if localMetatableInfo then
+            if localMetatableInfos_array then
                 local funcLiteral = Ast.FunctionLiteralExpression(node.args, node.body);
-                local newExpr = self:CreateAssignmentExpression(localMetatableInfo, funcLiteral, node.scope);
+                -- Phase 7.2: Pass array and pipeline to CreateAssignmentExpression
+                local newExpr = self:CreateAssignmentExpression(localMetatableInfos_array, funcLiteral, node.scope, pipeline);
                 return Ast.LocalVariableDeclaration(node.scope, {node.id}, {newExpr});
             end
         end
 
         -- Function Declaration
         if(node.kind == AstKind.FunctionDeclaration) then
-            local localMetatableInfo = getLocalMetatableInfo(node.scope, node.id);
-            if(localMetatableInfo) then
-                table.insert(node.indices, 1, localMetatableInfo.valueName);
+            local localMetatableInfos_array = getLocalMetatableInfo(node.scope, node.id);
+            if(localMetatableInfos_array) then
+                -- Phase 7.2: Use OUTERMOST level's valueName (last in array)
+                local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
+                table.insert(node.indices, 1, outermostInfo.valueName);
             end
         end
     end)
