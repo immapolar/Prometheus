@@ -129,7 +129,15 @@ function Entropy.generateSeed(sourceCode, filename, userSeed)
 
 	-- Final mixing pass using jenkinsHash for uniform distribution
 	-- Convert seed to string for hashing, then hash it
-	local seedString = string.format("%d:%d:%d:%d", contentHash, filenameHash, timestamp, userSeed);
+	-- IMPORTANT: Only include timestamp if userSeed <= 0 (polymorphic mode)
+	local seedString;
+	if userSeed > 0 then
+		-- Reproducible mode: Exclude timestamp
+		seedString = string.format("%d:%d:%d", contentHash, filenameHash, userSeed);
+	else
+		-- Polymorphic mode: Include timestamp
+		seedString = string.format("%d:%d:%d:%d", contentHash, filenameHash, timestamp, userSeed);
+	end
 	local finalMix = util.jenkinsHash(seedString);
 
 	-- Final XOR with accumulated seed
