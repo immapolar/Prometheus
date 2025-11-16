@@ -193,12 +193,18 @@ local function generateLocalMetatableInfo(pipeline)
 
     -- Separate binary and unary operations (done once for all levels)
     local binaryOps = {};
+    local binaryOpsExcludingIndex = {};  -- For setValue (excluding __index)
     local unaryOps = {};
     for i, metamethod in ipairs(availableMetamethods) do
         if metamethod.isUnary then
             table.insert(unaryOps, metamethod);
         else
             table.insert(binaryOps, metamethod);
+            -- __index cannot be used for setValue (only for getValue)
+            -- setValue requires mutation semantics, but __index is read-only
+            if metamethod.key ~= "__index" then
+                table.insert(binaryOpsExcludingIndex, metamethod);
+            end
         end
     end
 
@@ -207,10 +213,10 @@ local function generateLocalMetatableInfo(pipeline)
         local usedOps = {};  -- Separate tracking per level
         local info = {};
 
-        -- setValue: Must use binary operation (requires 2 arguments)
+        -- setValue: Must use binary operation excluding __index (requires 2 arguments, write semantics)
         local setValueOp;
         repeat
-            setValueOp = binaryOps[math.random(#binaryOps)];
+            setValueOp = binaryOpsExcludingIndex[math.random(#binaryOpsExcludingIndex)];
         until not usedOps[setValueOp];
         usedOps[setValueOp] = true;
         info.setValue = setValueOp;
@@ -344,14 +350,19 @@ function ProifyLocals:createGetValueFunction(info, isInnermost, parentScope, pip
         );
     else
         -- Level 2+: Chain to inner level's getValue
-        -- function(self, arg) return self[valueName] <getValue.op> <literal> end
         local indexExpr = self:getIndexExpression(
             getValueFunctionScope,
             getValueSelf,
             info
         );
 
-        if info.getValue.isUnary then
+        -- Special case: __index must index the inner proxy with the key argument
+        -- __index expects (table, key) and should chain: return self[valueName][key]
+        if info.getValue.key == "__index" then
+            -- For outer levels with __index: index the inner proxy with the key argument
+            -- This allows the chain to continue: outerProxy[key] -> innerProxy[key] -> ...
+            returnExpr = Ast.IndexExpression(indexExpr, Ast.VariableExpression(getValueFunctionScope, getValueArg));
+        elseif info.getValue.isUnary then
             -- Unary: just apply operation to inner proxy
             returnExpr = info.getValue.constructor(indexExpr);
         else
