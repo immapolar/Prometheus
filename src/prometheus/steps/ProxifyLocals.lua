@@ -171,8 +171,9 @@ local MetatableExpressions = {
     },
 }
 
-function ProifyLocals:init(settings)
-	self.LiteralType = settings.LiteralType or "number";
+function ProifyLocals:init()
+	-- Settings are already applied by Step:new()
+	-- self.LiteralType is already set from SettingsDescriptor
 end
 
 -- Phase 7, Objective 7.1 & 7.2: Dynamic Metamethod Selection with Nested Proxy Chains
