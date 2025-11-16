@@ -9,14 +9,13 @@ return {
         LuaVersion = "Lua51";
         VarNamePrefix = "";
         NameGenerator = "MangledShuffled";
-        PrettyPrint = false;
-        Seed = 0;
+        PrettyPrint = true;
+        Seed = 12345;
         Steps = {
             {
-                Name = "NumbersToExpressions";
+                Name = "ProxifyLocals";
                 Settings = {
-                    Treshold = 1;
-                    InternalTreshold = 0.2;
+                    LiteralType = "number";
                 };
             },
         }
