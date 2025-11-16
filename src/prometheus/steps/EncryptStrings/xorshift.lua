@@ -5,6 +5,10 @@
 --
 -- XORShift Variant
 -- Fast PRNG with good statistical properties, randomized shift parameters per file
+--
+-- Lua Version Compatibility: Lua 5.2+ ONLY (requires bit32 library)
+-- Dependencies: bit32.bxor, bit32.lshift, bit32.rshift in GENERATED decryption code
+-- WARNING: Will crash in Lua 5.1 runtime with "attempt to index global 'bit32' (a nil value)"
 
 local bit32 = require("prometheus.bit").bit32;
 

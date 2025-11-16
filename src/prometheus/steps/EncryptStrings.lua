@@ -16,6 +16,7 @@ local logger = require("logger")
 local visitast = require("prometheus.visitast");
 local util     = require("prometheus.util")
 local AstKind = Ast.AstKind;
+local LuaVersion = Enums.LuaVersion;
 
 -- Phase 2, Objective 2.1: Load all encryption algorithm variants
 local LCG = require("prometheus.steps.EncryptStrings.lcg")
@@ -34,18 +35,37 @@ function EncryptStrings:init(settings) end
 
 -- Phase 2, Objective 2.1: Register all encryption algorithm variants
 -- This allows the polymorphism framework to randomly select one per file
-function EncryptStrings:registerVariants(polymorphism)
+-- Lua Version Filtering: Only register variants compatible with target Lua version
+function EncryptStrings:registerVariants(polymorphism, luaVersion)
+	-- LCG: Compatible with all Lua versions (no bit32 dependency)
 	polymorphism:registerVariant(self.Name, "LCG", LCG)
-	polymorphism:registerVariant(self.Name, "XORShift", XORShift)
-	polymorphism:registerVariant(self.Name, "ChaCha", ChaCha)
+
+	-- BlumBlumShub: Compatible with all Lua versions (no bit32 dependency)
 	polymorphism:registerVariant(self.Name, "BlumBlumShub", BlumBlumShub)
-	polymorphism:registerVariant(self.Name, "MixedCongruential", MixedCongruential)
+
+	-- XORShift: Requires Lua 5.2+ (uses bit32.bxor, bit32.lshift, bit32.rshift)
+	-- Generated decryption code will crash in Lua 5.1 with "attempt to index global 'bit32' (a nil value)"
+	if luaVersion ~= LuaVersion.Lua51 and luaVersion ~= LuaVersion.LuaU then
+		polymorphism:registerVariant(self.Name, "XORShift", XORShift)
+	end
+
+	-- ChaCha: Requires Lua 5.2+ (uses bit32.bxor, bit32.lrotate, bit32.rrotate)
+	-- Generated decryption code will crash in Lua 5.1 with "attempt to index global 'bit32' (a nil value)"
+	if luaVersion ~= LuaVersion.Lua51 and luaVersion ~= LuaVersion.LuaU then
+		polymorphism:registerVariant(self.Name, "ChaCha", ChaCha)
+	end
+
+	-- MixedCongruential: Requires Lua 5.2+ (uses bit32.bxor)
+	-- Generated decryption code will crash in Lua 5.1 with "attempt to index global 'bit32' (a nil value)"
+	if luaVersion ~= LuaVersion.Lua51 and luaVersion ~= LuaVersion.LuaU then
+		polymorphism:registerVariant(self.Name, "MixedCongruential", MixedCongruential)
+	end
 end
 
 function EncryptStrings:apply(ast, pipeline)
 	-- Phase 2, Objective 2.1: Polymorphic encryption variant selection
-	-- Register variants if not already done
-	self:registerVariants(pipeline.polymorphism)
+	-- Register variants with Lua version filtering
+	self:registerVariants(pipeline.polymorphism, pipeline.LuaVersion)
 
 	-- Select encryption variant for this file
 	local EncryptionVariant = pipeline.polymorphism:selectVariant(self.Name)

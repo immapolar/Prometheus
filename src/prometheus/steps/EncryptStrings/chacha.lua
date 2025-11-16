@@ -6,6 +6,10 @@
 -- ChaCha20-based Variant
 -- Lightweight stream cipher using ARX (Addition-Rotation-XOR) operations
 -- Simplified ChaCha20 quarter-round with randomized constants per file
+--
+-- Lua Version Compatibility: Lua 5.2+ ONLY (requires bit32 library)
+-- Dependencies: bit32.bxor, bit32.lrotate, bit32.rrotate in GENERATED decryption code
+-- WARNING: Will crash in Lua 5.1 runtime with "attempt to index global 'bit32' (a nil value)"
 
 local bit32 = require("prometheus.bit").bit32;
 

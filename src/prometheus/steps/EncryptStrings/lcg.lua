@@ -5,6 +5,9 @@
 --
 -- LCG (Linear Congruential Generator) Variant
 -- Original encryption algorithm - kept for compatibility and as baseline variant
+--
+-- Lua Version Compatibility: ALL (Lua 5.1, Lua 5.2+, LuaU, FiveM)
+-- Dependencies: None (no bit32 operations in generated code)
 
 local LCG = {};
 

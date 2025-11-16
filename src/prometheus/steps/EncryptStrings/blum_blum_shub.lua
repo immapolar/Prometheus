@@ -6,6 +6,9 @@
 -- Blum Blum Shub Variant
 -- Cryptographically secure PRNG based on the difficulty of factoring
 -- Algorithm: x_{n+1} = (x_n)^2 mod M, where M = p * q (product of two Blum primes)
+--
+-- Lua Version Compatibility: ALL (Lua 5.1, Lua 5.2+, LuaU, FiveM)
+-- Dependencies: None (no bit32 operations in generated code)
 
 local BlumBlumShub = {};
 

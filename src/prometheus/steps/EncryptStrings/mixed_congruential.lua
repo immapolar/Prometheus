@@ -6,6 +6,10 @@
 -- Mixed Congruential Variant
 -- Combines multiple LCG generators with different parameters
 -- Better statistical properties than single LCG through combination
+--
+-- Lua Version Compatibility: Lua 5.2+ ONLY (requires bit32 library)
+-- Dependencies: bit32.bxor in GENERATED decryption code
+-- WARNING: Will crash in Lua 5.1 runtime with "attempt to index global 'bit32' (a nil value)"
 
 local bit32 = require("prometheus.bit").bit32;
 
