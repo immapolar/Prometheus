@@ -405,7 +405,7 @@ return {
             {
                 Name = "ProxifyLocals";
                 Settings = {
-                    LiteralType = "any";
+                    LiteralType = "number";  -- Changed from "any" to "number" for compatibility
                 }
             },
             {
@@ -500,7 +500,7 @@ return {
             {
                 Name = "ProxifyLocals";
                 Settings = {
-                    LiteralType = "any";
+                    LiteralType = "number";  -- Changed from "any" for stability
                 }
             },
             {
@@ -596,7 +596,7 @@ return {
             {
                 Name = "ProxifyLocals";
                 Settings = {
-                    LiteralType = "any";
+                    LiteralType = "number";  -- Changed from "any" for stability
                 }
             },
             {
@@ -692,7 +692,7 @@ return {
             {
                 Name = "ProxifyLocals";
                 Settings = {
-                    LiteralType = "any";
+                    LiteralType = "number";  -- Changed from "any" for stability
                 }
             },
             {
