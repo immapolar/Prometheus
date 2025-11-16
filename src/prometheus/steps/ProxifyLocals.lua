@@ -717,6 +717,7 @@ function ProifyLocals:apply(ast, pipeline)
     table.insert(ast.body.statements, 1, Ast.LocalVariableDeclaration(self.setMetatableVarScope, {self.setMetatableVarId}, {
         Ast.VariableExpression(self.setMetatableVarScope:resolveGlobal("setmetatable"))
     }));
+    return ast;
 end
 
 return ProifyLocals;
