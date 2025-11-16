@@ -118,6 +118,66 @@ return {
             },
         }
     };
+    ["Phase51TestAntiTamper"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "AntiTamper";
+                Settings = {
+                    UseDebug = false;
+                };
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["Phase51TestMultiStep"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "EncryptStrings";
+                Settings = {};
+            },
+            {
+                Name = "AntiTamper";
+                Settings = {
+                    UseDebug = false;
+                };
+            },
+            {
+                Name = "Vmify";
+                Settings = {};
+            },
+            {
+                Name = "ConstantArray";
+                Settings = {
+                    Treshold = 1;
+                    StringsOnly = true;
+                    Shuffle = true;
+                    Rotate = true;
+                    LocalWrapperTreshold = 0;
+                };
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
     ["Weak"] = {
         -- The default LuaVersion is Lua51
         LuaVersion = "Lua51";
