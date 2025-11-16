@@ -172,7 +172,7 @@ local MetatableExpressions = {
 }
 
 function ProifyLocals:init(settings)
-	
+	self.LiteralType = settings.LiteralType or "number";
 end
 
 -- Phase 7, Objective 7.1 & 7.2: Dynamic Metamethod Selection with Nested Proxy Chains
