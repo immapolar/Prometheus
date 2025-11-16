@@ -1,8 +1,10 @@
 -- This Script is Part of the Prometheus Obfuscator by Levno_710
 --
 -- EncryptStrings.lua
+-- Phase 2, Objective 2.1: Multiple Encryption Algorithms
 --
--- This Script provides a Simple Obfuscation Step that encrypts strings
+-- This Script provides a Polymorphic String Encryption Step
+-- Randomly selects from 5 different encryption algorithm variants per file
 
 local Step = require("prometheus.step")
 local Ast = require("prometheus.ast")
@@ -14,180 +16,71 @@ local logger = require("logger")
 local visitast = require("prometheus.visitast");
 local util     = require("prometheus.util")
 local AstKind = Ast.AstKind;
+local LuaVersion = Enums.LuaVersion;
+
+-- Phase 2, Objective 2.1: Load all encryption algorithm variants
+local LCG = require("prometheus.steps.EncryptStrings.lcg")
+local XORShift = require("prometheus.steps.EncryptStrings.xorshift")
+local ChaCha = require("prometheus.steps.EncryptStrings.chacha")
+local BlumBlumShub = require("prometheus.steps.EncryptStrings.blum_blum_shub")
+local MixedCongruential = require("prometheus.steps.EncryptStrings.mixed_congruential")
 
 local EncryptStrings = Step:extend()
-EncryptStrings.Description = "This Step will encrypt strings within your Program."
+EncryptStrings.Description = "This Step will encrypt strings within your Program using polymorphic encryption algorithms."
 EncryptStrings.Name = "Encrypt Strings"
 
 EncryptStrings.SettingsDescriptor = {}
 
 function EncryptStrings:init(settings) end
 
+-- Phase 2, Objective 2.1: Register all encryption algorithm variants
+-- This allows the polymorphism framework to randomly select one per file
+-- Lua Version Filtering: Only register variants compatible with target Lua version
+function EncryptStrings:registerVariants(polymorphism, luaVersion)
+	-- LCG: Compatible with all Lua versions (no bit32 dependency)
+	polymorphism:registerVariant(self.Name, "LCG", LCG)
 
-function EncryptStrings:CreateEncrypionService()
-	local usedSeeds = {};
+	-- BlumBlumShub: Compatible with all Lua versions (no bit32 dependency)
+	polymorphism:registerVariant(self.Name, "BlumBlumShub", BlumBlumShub)
 
-	local secret_key_6 = math.random(0, 63) -- 6-bit  arbitrary integer (0..63)
-	local secret_key_7 = math.random(0, 127) -- 7-bit  arbitrary integer (0..127)
-	local secret_key_44 = math.random(0, 17592186044415) -- 44-bit arbitrary integer (0..17592186044415)
-	local secret_key_8 = math.random(0, 255); -- 8-bit  arbitrary integer (0..255)
-
-	local floor = math.floor
-
-	local function primitive_root_257(idx)
-		local g, m, d = 1, 128, 2 * idx + 1
-		repeat
-			g, m, d = g * g * (d >= m and 3 or 1) % 257, m / 2, d % m
-		until m < 1
-		return g
+	-- XORShift: Requires Lua 5.2+ (uses bit32.bxor, bit32.lshift, bit32.rshift)
+	-- Generated decryption code will crash in Lua 5.1 with "attempt to index global 'bit32' (a nil value)"
+	if luaVersion ~= LuaVersion.Lua51 and luaVersion ~= LuaVersion.LuaU then
+		polymorphism:registerVariant(self.Name, "XORShift", XORShift)
 	end
 
-	local param_mul_8 = primitive_root_257(secret_key_7)
-	local param_mul_45 = secret_key_6 * 4 + 1
-	local param_add_45 = secret_key_44 * 2 + 1
-
-	local state_45 = 0
-	local state_8 = 2
-
-	local prev_values = {}
-	local function set_seed(seed_53)
-		state_45 = seed_53 % 35184372088832
-		state_8 = seed_53 % 255 + 2
-		prev_values = {}
+	-- ChaCha: Requires Lua 5.2+ (uses bit32.bxor, bit32.lrotate, bit32.rrotate)
+	-- Generated decryption code will crash in Lua 5.1 with "attempt to index global 'bit32' (a nil value)"
+	if luaVersion ~= LuaVersion.Lua51 and luaVersion ~= LuaVersion.LuaU then
+		polymorphism:registerVariant(self.Name, "ChaCha", ChaCha)
 	end
 
-	local function gen_seed()
-		local seed;
-		repeat
-			seed = math.random(0, 35184372088832);
-		until not usedSeeds[seed];
-		usedSeeds[seed] = true;
-		return seed;
+	-- MixedCongruential: Requires Lua 5.2+ (uses bit32.bxor)
+	-- Generated decryption code will crash in Lua 5.1 with "attempt to index global 'bit32' (a nil value)"
+	if luaVersion ~= LuaVersion.Lua51 and luaVersion ~= LuaVersion.LuaU then
+		polymorphism:registerVariant(self.Name, "MixedCongruential", MixedCongruential)
 	end
-
-	local function get_random_32()
-		state_45 = (state_45 * param_mul_45 + param_add_45) % 35184372088832
-		repeat
-			state_8 = state_8 * param_mul_8 % 257
-		until state_8 ~= 1
-		local r = state_8 % 32
-		local n = floor(state_45 / 2 ^ (13 - (state_8 - r) / 32)) % 2 ^ 32 / 2 ^ r
-		return floor(n % 1 * 2 ^ 32) + floor(n)
-	end
-
-	local function get_next_pseudo_random_byte()
-		if #prev_values == 0 then
-			local rnd = get_random_32() -- value 0..4294967295
-			local low_16 = rnd % 65536
-			local high_16 = (rnd - low_16) / 65536
-			local b1 = low_16 % 256
-			local b2 = (low_16 - b1) / 256
-			local b3 = high_16 % 256
-			local b4 = (high_16 - b3) / 256
-			prev_values = { b1, b2, b3, b4 }
-		end
-		--print(unpack(prev_values))
-		return table.remove(prev_values)
-	end
-
-	local function encrypt(str)
-		local seed = gen_seed();
-		set_seed(seed)
-		local len = string.len(str)
-		local out = {}
-		local prevVal = secret_key_8;
-		for i = 1, len do
-			local byte = string.byte(str, i);
-			out[i] = string.char((byte - (get_next_pseudo_random_byte() + prevVal)) % 256);
-			prevVal = byte;
-		end
-		return table.concat(out), seed;
-	end
-
-    local function genCode()
-        local code = [[
-do
-	local floor = math.floor
-	local random = math.random;
-	local remove = table.remove;
-	local char = string.char;
-	local state_45 = 0
-	local state_8 = 2
-	local digits = {}
-	local charmap = {};
-	local i = 0;
-
-	local nums = {};
-	for i = 1, 256 do
-		nums[i] = i;
-	end
-
-	repeat
-		local idx = random(1, #nums);
-		local n = remove(nums, idx);
-		charmap[n] = char(n - 1);
-	until #nums == 0;
-
-	local prev_values = {}
-	local function get_next_pseudo_random_byte()
-		if #prev_values == 0 then
-			state_45 = (state_45 * ]] .. tostring(param_mul_45) .. [[ + ]] .. tostring(param_add_45) .. [[) % 35184372088832
-			repeat
-				state_8 = state_8 * ]] .. tostring(param_mul_8) .. [[ % 257
-			until state_8 ~= 1
-			local r = state_8 % 32
-			local n = floor(state_45 / 2 ^ (13 - (state_8 - r) / 32)) % 2 ^ 32 / 2 ^ r
-			local rnd = floor(n % 1 * 2 ^ 32) + floor(n)
-			local low_16 = rnd % 65536
-			local high_16 = (rnd - low_16) / 65536
-			local b1 = low_16 % 256
-			local b2 = (low_16 - b1) / 256
-			local b3 = high_16 % 256
-			local b4 = (high_16 - b3) / 256
-			prev_values = { b1, b2, b3, b4 }
-		end
-		return table.remove(prev_values)
-	end
-
-	local realStrings = {};
-	STRINGS = setmetatable({}, {
-		__index = realStrings;
-		__metatable = nil;
-	});
-  	function DECRYPT(str, seed)
-		local realStringsLocal = realStrings;
-		if(realStringsLocal[seed]) then else
-			prev_values = {};
-			local chars = charmap;
-			state_45 = seed % 35184372088832
-			state_8 = seed % 255 + 2
-			local len = string.len(str);
-			realStringsLocal[seed] = "";
-			local prevVal = ]] .. tostring(secret_key_8) .. [[;
-			for i=1, len do
-				prevVal = (string.byte(str, i) + get_next_pseudo_random_byte() + prevVal) % 256
-				realStringsLocal[seed] = realStringsLocal[seed] .. chars[prevVal + 1];
-			end
-		end
-		return seed;
-	end
-end]]
-
-		return code;
-    end
-
-    return {
-        encrypt = encrypt,
-        param_mul_45 = param_mul_45,
-        param_mul_8 = param_mul_8,
-        param_add_45 = param_add_45,
-		secret_key_8 = secret_key_8,
-        genCode = genCode,
-    }
 end
 
 function EncryptStrings:apply(ast, pipeline)
-    local Encryptor = self:CreateEncrypionService();
+	-- Phase 2, Objective 2.1: Polymorphic encryption variant selection
+	-- Register variants with Lua version filtering
+	self:registerVariants(pipeline.polymorphism, pipeline.LuaVersion)
+
+	-- Select encryption variant for this file
+	local EncryptionVariant = pipeline.polymorphism:selectVariant(self.Name)
+
+	-- If no variant selected (polymorphism disabled or failed), fall back to LCG
+	if not EncryptionVariant then
+		EncryptionVariant = LCG
+		logger:warn("No encryption variant selected, falling back to LCG")
+	end
+
+	-- Create encryptor using selected variant
+	local Encryptor = EncryptionVariant.createEncryptor()
+
+	-- Log selected variant for debugging
+	logger:info(string.format("Using encryption variant: %s", Encryptor.variant or "Unknown"))
 
 	local code = Encryptor.genCode();
 	local newAst = Parser:new({ LuaVersion = Enums.LuaVersion.Lua51 }):parse(code);
@@ -196,7 +89,7 @@ function EncryptStrings:apply(ast, pipeline)
 	local scope = ast.body.scope;
 	local decryptVar = scope:addVariable();
 	local stringsVar = scope:addVariable();
-	
+
 	doStat.body.scope:setParent(ast.body.scope);
 
 	visitast(newAst, nil, function(node, data)
