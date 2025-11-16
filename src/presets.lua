@@ -61,6 +61,63 @@ return {
             },
         }
     };
+    ["Phase51TestEncrypt"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "EncryptStrings";
+                Settings = {};
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["Phase51TestNumbers"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "NumbersToExpressions";
+                Settings = {};
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["Phase51TestWrap"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "WrapInFunction";
+                Settings = {};
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
     ["Weak"] = {
         -- The default LuaVersion is Lua51
         LuaVersion = "Lua51";
