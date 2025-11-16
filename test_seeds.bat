@@ -174,7 +174,9 @@ echo.
 echo ========================================================================
 echo RESULTS
 echo ========================================================================
-echo Total Tests:          %TOTAL_TESTS%
+set /a TESTS_RUN=PASSING_COUNT+FAILING_COUNT
+echo Tests Planned:        %TOTAL_TESTS%
+echo Tests Run:            !TESTS_RUN!
 echo Passing:              !PASSING_COUNT!
 set /a RUNTIME_FAIL=FAILING_COUNT-OBF_FAIL_COUNT
 echo Failing (runtime):    !RUNTIME_FAIL!
@@ -191,10 +193,14 @@ if !FAILING_COUNT! GTR 0 (
     echo.
     echo Full results saved to: %RESULTS_FILE%
 
-    REM Calculate failure rate
-    set /a FAIL_RATE=FAILING_COUNT*100/TOTAL_TESTS
+    REM Calculate failure rate based on tests actually run
+    if !TESTS_RUN! GTR 0 (
+        set /a FAIL_RATE=FAILING_COUNT*100/TESTS_RUN
+    ) else (
+        set FAIL_RATE=0
+    )
     echo.
-    echo Failure Rate: !FAIL_RATE!%%
+    echo Failure Rate: !FAIL_RATE!%% ^(!FAILING_COUNT!/!TESTS_RUN! tests^)
 
     if !FAIL_RATE! GTR 50 (
         echo WARNING: HIGH FAILURE RATE - Indicates systematic issue

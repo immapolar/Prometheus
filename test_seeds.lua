@@ -197,8 +197,10 @@ print("\n")
 print("=" .. string.rep("=", 70))
 print("RESULTS")
 print("=" .. string.rep("=", 70))
-print(string.format("Total Tests:          %d", totalTests))
-print(string.format("Passing:              %d (%.1f%%)", #passingSeeds, (#passingSeeds / totalTests) * 100))
+local testsRun = #passingSeeds + #failingSeeds
+print(string.format("Tests Planned:        %d", totalTests))
+print(string.format("Tests Run:            %d", testsRun))
+print(string.format("Passing:              %d", #passingSeeds))
 print(string.format("Failing (runtime):    %d", #failingSeeds - #obfuscationFailures))
 print(string.format("Failing (obfuscate):  %d", #obfuscationFailures))
 print(string.format("Duration:             %d seconds", duration))
@@ -219,9 +221,9 @@ if #failingSeeds > 0 then
     print(string.format("  %s cli.lua --preset %s --seed %d %s", luaExe, preset, firstFail.seed, testFile))
     print(string.format("  %s %s", luaExe, obfuscatedFile))
 
-    -- Calculate failure rate
-    local failRate = (#failingSeeds / totalTests) * 100
-    print(string.format("\nFailure Rate: %.1f%%", failRate))
+    -- Calculate failure rate based on tests actually run
+    local failRate = testsRun > 0 and (#failingSeeds / testsRun) * 100 or 0
+    print(string.format("\nFailure Rate: %.1f%% (%d/%d tests)", failRate, #failingSeeds, testsRun))
 
     if failRate > 50 then
         print("⚠ HIGH FAILURE RATE - Indicates systematic issue")
