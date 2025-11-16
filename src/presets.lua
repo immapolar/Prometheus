@@ -178,6 +178,44 @@ return {
             },
         }
     };
+    ["Phase51TestProxifyThenNumbers"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+            {
+                Name = "NumbersToExpressions";
+                Settings = {};
+            },
+        }
+    };
+    ["Phase51TestProxifyThenWrap"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+            {
+                Name = "WrapInFunction";
+                Settings = {};
+            },
+        }
+    };
     ["Weak"] = {
         -- The default LuaVersion is Lua51
         LuaVersion = "Lua51";
