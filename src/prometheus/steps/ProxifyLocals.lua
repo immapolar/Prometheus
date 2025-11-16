@@ -325,7 +325,8 @@ end
 -- Phase 7.2: Helper function to create getValue metamethod function for one proxy level
 -- For innermost level: directly returns the value
 -- For outer levels: chains to inner level's getValue through metamethod operation
-function ProifyLocals:createGetValueFunction(info, isInnermost, parentScope, pipeline)
+-- Parameters: info (current level), isInnermost, parentScope, pipeline, innerInfo (for chaining)
+function ProifyLocals:createGetValueFunction(info, isInnermost, parentScope, pipeline, innerInfo)
     local getValueFunctionScope = Scope:new(parentScope);
     local getValueSelf = getValueFunctionScope:addVariable();
     local getValueArg = nil;
@@ -349,35 +350,52 @@ function ProifyLocals:createGetValueFunction(info, isInnermost, parentScope, pip
             info
         );
     else
-        -- Level 2+: Chain to inner level's getValue
+        -- Level 2+: Chain to inner level's getValue by triggering inner proxy's metamethod
+        -- First, get the inner proxy
         local indexExpr = self:getIndexExpression(
             getValueFunctionScope,
             getValueSelf,
             info
         );
 
+        -- Now trigger the inner proxy's getValue metamethod to unwrap it
+        -- This creates the chaining: outer.getValue() -> inner.getValue() -> ... -> actual value
+        local innerValueExpr;
+
         -- Special case: __index must index the inner proxy with the key argument
         -- __index expects (table, key) and should chain: return self[valueName][key]
         if info.getValue.key == "__index" then
             -- For outer levels with __index: index the inner proxy with the key argument
             -- This allows the chain to continue: outerProxy[key] -> innerProxy[key] -> ...
-            returnExpr = Ast.IndexExpression(indexExpr, Ast.VariableExpression(getValueFunctionScope, getValueArg));
-        elseif info.getValue.isUnary then
-            -- Unary: just apply operation to inner proxy
-            returnExpr = info.getValue.constructor(indexExpr);
+            innerValueExpr = Ast.IndexExpression(indexExpr, Ast.VariableExpression(getValueFunctionScope, getValueArg));
         else
-            -- Binary: apply operation with random literal
-            local literal;
-            if self.LiteralType == "dictionary" then
-                literal = RandomLiterals.Dictionary();
-            elseif self.LiteralType == "number" then
-                literal = RandomLiterals.Number();
-            elseif self.LiteralType == "string" then
-                literal = RandomLiterals.String(pipeline);
+            -- For non-__index: trigger inner proxy's getValue to unwrap it
+            -- The THIS level's getValue operation is already being triggered by Lua
+            -- (when user does `var <op> value`), so we only need to unwrap the inner
+            -- value and return it. The operation shouldn't be applied again inside.
+            -- innerValueExpr = indexExpr <innerInfo.getValue.op> <literal>
+            if innerInfo.getValue.isUnary then
+                -- Inner getValue is unary: apply operation directly
+                returnExpr = innerInfo.getValue.constructor(indexExpr);
             else
-                literal = RandomLiterals.Any(pipeline);
+                -- Inner getValue is binary: apply with random literal
+                local innerLiteral;
+                if self.LiteralType == "dictionary" then
+                    innerLiteral = RandomLiterals.Dictionary();
+                elseif self.LiteralType == "number" then
+                    innerLiteral = RandomLiterals.Number();
+                elseif self.LiteralType == "string" then
+                    innerLiteral = RandomLiterals.String(pipeline);
+                else
+                    innerLiteral = RandomLiterals.Any(pipeline);
+                end
+                returnExpr = innerInfo.getValue.constructor(indexExpr, innerLiteral);
             end
-            returnExpr = info.getValue.constructor(indexExpr, literal);
+        end
+
+        -- For __index case, the returnExpr was set above
+        if info.getValue.key == "__index" then
+            returnExpr = innerValueExpr;
         end
     end
 
@@ -398,6 +416,7 @@ function ProifyLocals:CreateAssignmentExpression(infos, expr, parentScope, pipel
     for level = 1, #infos do
         local info = infos[level];
         local isInnermost = (level == 1);
+        local innerInfo = (level > 1) and infos[level - 1] or nil;  -- Previous level (inner)
 
         local metatableVals = {};
 
@@ -408,8 +427,8 @@ function ProifyLocals:CreateAssignmentExpression(infos, expr, parentScope, pipel
             setValueFunc
         ));
 
-        -- Create getValue function for this level
-        local getValueFunc = self:createGetValueFunction(info, isInnermost, parentScope, pipeline);
+        -- Create getValue function for this level (pass innerInfo for chaining)
+        local getValueFunc = self:createGetValueFunction(info, isInnermost, parentScope, pipeline, innerInfo);
         table.insert(metatableVals, Ast.KeyedTableEntry(
             Ast.StringExpression(info.getValue.key),
             getValueFunc
