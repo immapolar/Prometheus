@@ -9,9 +9,50 @@ return {
         LuaVersion = "Lua51";
         VarNamePrefix = "";
         NameGenerator = "MangledShuffled";
-        PrettyPrint = true;
+        PrettyPrint = false;
         Seed = 12345;
         Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["Phase51TestVmify"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "Vmify";
+                Settings = {};
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["Phase51TestConstArray"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 12345;
+        Steps = {
+            {
+                Name = "ConstantArray";
+                Settings = {
+                    Treshold = 1;
+                    StringsOnly = true;
+                };
+            },
             {
                 Name = "ProxifyLocals";
                 Settings = {
