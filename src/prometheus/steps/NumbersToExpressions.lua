@@ -523,6 +523,12 @@ function NumbersToExpressions:init(settings)
                 -- Linear polynomial: val = a*x + b
                 local a = math.random(1, 10);
                 local b = math.random(-20, 20);
+
+                -- Ensure x is an integer to avoid floating-point precision errors
+                if (val - b) % a ~= 0 then
+                    return false;
+                end
+
                 local x = (val - b) / a;
 
                 if tonumber(tostring(a * x + b)) ~= val then
