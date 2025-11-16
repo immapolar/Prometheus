@@ -705,6 +705,23 @@ return {
         }
     };
 
+    -- Strong without Vmify (test if Vmify conflicts with ProxifyLocals)
+    ["StrongNoVmify"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 0;
+        Steps = {
+            {Name = "EncryptStrings"; Settings = {};},
+            {Name = "AntiTamper"; Settings = {UseDebug = false;};},
+            {Name = "ProxifyLocals"; Settings = {LiteralType = "number";}},
+            {Name = "ConstantArray"; Settings = {Treshold = 1; StringsOnly = true; Shuffle = true; Rotate = true; LocalWrapperTreshold = 0;}},
+            {Name = "NumbersToExpressions"; Settings = {};},
+            {Name = "WrapInFunction"; Settings = {};},
+        }
+    };
+
     -- Diagnostic Seed Tests: Multiple seeds to isolate metamethod failures
     ["SeedTest1000"] = {
         LuaVersion = "Lua51";
