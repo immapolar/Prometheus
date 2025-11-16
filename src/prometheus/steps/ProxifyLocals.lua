@@ -584,22 +584,25 @@ function ProifyLocals:apply(ast, pipeline)
                     --     emptyFunc(c <setValue> temp3)  -- if 'c' is proxified
                     --   end
 
+                    -- Create a NEW child scope for the do-block (proper Lua lexical scoping)
+                    local doBlockScope = Scope:new(data.scope);
+
                     local statements = {};
                     local temps = {};
 
-                    -- Create temporary variables in PARENT scope (not new scope) to prevent shadowing
+                    -- Create temporary variables in do-block scope
                     -- Lua semantics: if #rhs < #lhs, missing values are nil
                     local rhsCount = #node.rhs;
                     for i = 1, #node.lhs do
-                        temps[i] = data.scope:addVariable();  -- Add to PARENT scope
+                        temps[i] = doBlockScope:addVariable();  -- Add to do-block scope
                         -- CRITICAL: Disable proxification for temp variables to prevent corruption
-                        disableMetatableInfo(data.scope, temps[i]);
+                        disableMetatableInfo(doBlockScope, temps[i]);
                     end
 
                     -- Statement 1: Declare temps and assign RHS expressions (preserving Lua parallel evaluation)
                     -- NOTE: At this point, node.rhs has already been transformed by visitast (we're in postvisit)
                     table.insert(statements, Ast.LocalVariableDeclaration(
-                        data.scope,  -- Declare in parent scope to prevent shadowing
+                        doBlockScope,  -- Declare in do-block scope
                         temps,
                         node.rhs  -- All RHS expressions already transformed
                     ));
@@ -607,7 +610,7 @@ function ProifyLocals:apply(ast, pipeline)
                     -- Statement 2...N: Assign each temp to corresponding LHS variable
                     for i = 1, #node.lhs do
                         local lhsInfo = proxifiedLhsInfos[i];
-                        local tempVar = Ast.VariableExpression(data.scope, temps[i]);  -- Reference from parent scope
+                        local tempVar = Ast.VariableExpression(doBlockScope, temps[i]);  -- Reference from do-block scope
 
                         if lhsInfo.isVariable and lhsInfo.infos then
                             -- LHS is proxified: use setValue metamethod
@@ -617,7 +620,7 @@ function ProifyLocals:apply(ast, pipeline)
                             local setExpr = outermostInfo.setValue.constructor(vexp, tempVar);
 
                             self.emptyFunctionUsed = true;
-                            data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
+                            doBlockScope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
 
                             table.insert(statements, Ast.FunctionCallStatement(
                                 Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId),
@@ -632,8 +635,8 @@ function ProifyLocals:apply(ast, pipeline)
                         end
                     end
 
-                    -- Return DoStatement with block using parent scope (temps won't shadow anything)
-                    return Ast.DoStatement(Ast.Block(statements, data.scope));
+                    -- Return DoStatement with proper child scope for do-block
+                    return Ast.DoStatement(Ast.Block(statements, doBlockScope));
             end
         end
 
