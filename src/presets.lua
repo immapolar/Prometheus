@@ -161,6 +161,12 @@ return {
                 }
             },
             {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "any";
+                }
+            },
+            {
                 Name = "NumbersToExpressions";
                 Settings = {
 
@@ -248,6 +254,12 @@ return {
                     MinLength = 5;
                     MaxLength = 8;
                 };
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "any";
+                }
             },
             {
                 Name = "WrapInFunction";
@@ -340,6 +352,12 @@ return {
                 };
             },
             {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "any";
+                }
+            },
+            {
                 Name = "WrapInFunction";
                 Settings = {
                     Iterations = 2;
@@ -428,6 +446,12 @@ return {
                 Name = "AddVararg";
                 Settings = {
                 };
+            },
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "any";
+                }
             },
             {
                 Name = "WrapInFunction";
