@@ -271,7 +271,8 @@ end
 -- Phase 7.2: Helper function to create setValue metamethod function for one proxy level
 -- For innermost level: directly sets the value
 -- For outer levels: chains to inner level's setValue through metamethod operation
-function ProifyLocals:createSetValueFunction(info, isInnermost, parentScope, pipeline)
+-- Parameters: info (current level), isInnermost, parentScope, pipeline, innerInfo (for chaining)
+function ProifyLocals:createSetValueFunction(info, isInnermost, parentScope, pipeline, innerInfo)
     local setValueFunctionScope = Scope:new(parentScope);
     local setValueSelf = setValueFunctionScope:addVariable();
     local setValueArg = setValueFunctionScope:addVariable();
@@ -293,14 +294,15 @@ function ProifyLocals:createSetValueFunction(info, isInnermost, parentScope, pip
         }, setValueFunctionScope);
     else
         -- Level 2+: Chain to inner level's setValue
-        -- function(self, arg) emptyFunc(self[valueName] <setValue.op> arg) end
+        -- function(self, arg) emptyFunc(self[valueName] <innerSetValue.op> arg) end
+        -- Use innerInfo.setValue because we're triggering the INNER level's setValue metamethod
         local indexExpr = self:getIndexExpression(
             setValueFunctionScope,
             setValueSelf,
             info
         );
 
-        local chainExpr = info.setValue.constructor(
+        local chainExpr = innerInfo.setValue.constructor(
             indexExpr,
             Ast.VariableExpression(setValueFunctionScope, setValueArg)
         );
@@ -420,8 +422,8 @@ function ProifyLocals:CreateAssignmentExpression(infos, expr, parentScope, pipel
 
         local metatableVals = {};
 
-        -- Create setValue function for this level
-        local setValueFunc = self:createSetValueFunction(info, isInnermost, parentScope, pipeline);
+        -- Create setValue function for this level (pass innerInfo for chaining)
+        local setValueFunc = self:createSetValueFunction(info, isInnermost, parentScope, pipeline, innerInfo);
         table.insert(metatableVals, Ast.KeyedTableEntry(
             Ast.StringExpression(info.setValue.key),
             setValueFunc
@@ -482,6 +484,9 @@ function ProifyLocals:apply(ast, pipeline)
     self.setMetatableVarScope = ast.body.scope;
     self.setMetatableVarId    = ast.body.scope:addVariable();
 
+    -- Disable proxification for setmetatable reference
+    disableMetatableInfo(self.setMetatableVarScope, self.setMetatableVarId);
+
     -- Create Empty Function Variable
     self.emptyFunctionScope   = ast.body.scope;
     self.emptyFunctionId      = ast.body.scope:addVariable();
@@ -491,6 +496,9 @@ function ProifyLocals:apply(ast, pipeline)
     table.insert(ast.body.statements, 1, Ast.LocalVariableDeclaration(self.emptyFunctionScope, {self.emptyFunctionId}, {
         Ast.FunctionLiteralExpression({}, Ast.Block({}, Scope:new(ast.body.scope)));
     }));
+
+    -- Disable proxification for the empty function itself
+    disableMetatableInfo(self.emptyFunctionScope, self.emptyFunctionId);
 
 
     visitast(ast, function(node, data)
@@ -513,42 +521,59 @@ function ProifyLocals:apply(ast, pipeline)
             end
         end
 
-        -- Assignment Statements may be Obfuscated Differently
+        -- PRE-VISIT: Mark Assignment Statements that need proxify transformation
+        -- This happens BEFORE LHS expressions are transformed, so we can detect proxified variables
         if(node.kind == AstKind.AssignmentStatement) then
-            -- First pass: identify which LHS variables are proxified
             local hasProxifiedVar = false;
-            local proxifiedLhsInfos = {};  -- Maps index to metatable info array (or nil if not proxified)
+            local proxifiedLhsInfos = {};
 
             for i, lhs in ipairs(node.lhs) do
+                -- LHS can be either AssignmentVariable (simple variable) or AssignmentIndexing (table access)
                 if lhs.kind == AstKind.AssignmentVariable then
                     local localMetatableInfos_array = getLocalMetatableInfo(lhs.scope, lhs.id);
-                    proxifiedLhsInfos[i] = localMetatableInfos_array;
+                    proxifiedLhsInfos[i] = {
+                        isVariable = true,
+                        scope = lhs.scope,
+                        id = lhs.id,
+                        infos = localMetatableInfos_array
+                    };
                     if localMetatableInfos_array then
                         hasProxifiedVar = true;
                     end
                 else
-                    proxifiedLhsInfos[i] = nil;  -- Indexing expressions, not simple variables
+                    -- AssignmentIndexing or other expression type
+                    proxifiedLhsInfos[i] = {isVariable = false};
                 end
             end
 
-            -- Only transform if at least one variable is proxified
+            -- Store original LHS info before transformation and mark for postvisit
             if hasProxifiedVar then
+                node.__needsProxifyTransform = true;
+                node.__originalLhsInfos = proxifiedLhsInfos;
+            end
+        end
+    end, function(node, data)
+        -- POST-VISIT: Assignment Statements (processed AFTER RHS expressions have been transformed)
+        if(node.kind == AstKind.AssignmentStatement and node.__needsProxifyTransform) then
+            -- Use pre-stored LHS info from previsit (before LHS was transformed)
+            local proxifiedLhsInfos = node.__originalLhsInfos;
+
+            -- Transform the assignment
+            if #node.lhs == 1 then
                 -- SINGLE ASSIGNMENT: Use optimized direct transformation
-                if #node.lhs == 1 then
-                    local variable = node.lhs[1];
-                    local localMetatableInfos_array = proxifiedLhsInfos[1];
-                    if localMetatableInfos_array then
-                        -- Phase 7.2: Use OUTERMOST level's setValue (last in array)
-                        local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
-                        local args = shallowcopy(node.rhs);
-                        local vexp = Ast.VariableExpression(variable.scope, variable.id);
-                        vexp.__ignoreProxifyLocals = true;
-                        args[1] = outermostInfo.setValue.constructor(vexp, args[1]);
-                        self.emptyFunctionUsed = true;
-                        data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
-                        return Ast.FunctionCallStatement(Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId), args);
-                    end
-                else
+                local lhsInfo = proxifiedLhsInfos[1];
+                if lhsInfo.isVariable and lhsInfo.infos then
+                    -- Phase 7.2: Use OUTERMOST level's setValue (last in array)
+                    local outermostInfo = lhsInfo.infos[#lhsInfo.infos];
+                    local args = shallowcopy(node.rhs);
+                    local vexp = Ast.VariableExpression(lhsInfo.scope, lhsInfo.id);
+                    vexp.__ignoreProxifyLocals = true;
+                    args[1] = outermostInfo.setValue.constructor(vexp, args[1]);
+                    self.emptyFunctionUsed = true;
+                    data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
+                    return Ast.FunctionCallStatement(Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId), args);
+                end
+            else
                     -- MULTIPLE ASSIGNMENT: Transform to do-block with temporaries
                     -- Original: a, b, c = expr1, expr2, expr3
                     -- Transform to:
@@ -567,24 +592,27 @@ function ProifyLocals:apply(ast, pipeline)
                     local rhsCount = #node.rhs;
                     for i = 1, #node.lhs do
                         temps[i] = data.scope:addVariable();  -- Add to PARENT scope
+                        -- CRITICAL: Disable proxification for temp variables to prevent corruption
+                        disableMetatableInfo(data.scope, temps[i]);
                     end
 
                     -- Statement 1: Declare temps and assign RHS expressions (preserving Lua parallel evaluation)
+                    -- NOTE: At this point, node.rhs has already been transformed by visitast (we're in postvisit)
                     table.insert(statements, Ast.LocalVariableDeclaration(
                         data.scope,  -- Declare in parent scope to prevent shadowing
                         temps,
-                        node.rhs  -- All RHS expressions evaluated in parallel
+                        node.rhs  -- All RHS expressions already transformed
                     ));
 
                     -- Statement 2...N: Assign each temp to corresponding LHS variable
-                    for i, lhs in ipairs(node.lhs) do
-                        local localMetatableInfos_array = proxifiedLhsInfos[i];
+                    for i = 1, #node.lhs do
+                        local lhsInfo = proxifiedLhsInfos[i];
                         local tempVar = Ast.VariableExpression(data.scope, temps[i]);  -- Reference from parent scope
 
-                        if localMetatableInfos_array then
+                        if lhsInfo.isVariable and lhsInfo.infos then
                             -- LHS is proxified: use setValue metamethod
-                            local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
-                            local vexp = Ast.VariableExpression(lhs.scope, lhs.id);
+                            local outermostInfo = lhsInfo.infos[#lhsInfo.infos];
+                            local vexp = Ast.VariableExpression(lhsInfo.scope, lhsInfo.id);
                             vexp.__ignoreProxifyLocals = true;
                             local setExpr = outermostInfo.setValue.constructor(vexp, tempVar);
 
@@ -596,9 +624,9 @@ function ProifyLocals:apply(ast, pipeline)
                                 {setExpr}
                             ));
                         else
-                            -- LHS is not proxified (or is indexing expression): direct assignment
+                            -- LHS is not proxified (or is indexing expression): direct assignment using original LHS
                             table.insert(statements, Ast.AssignmentStatement(
-                                {lhs},
+                                {node.lhs[i]},  -- Use transformed LHS from node
                                 {tempVar}
                             ));
                         end
@@ -606,11 +634,10 @@ function ProifyLocals:apply(ast, pipeline)
 
                     -- Return DoStatement with block using parent scope (temps won't shadow anything)
                     return Ast.DoStatement(Ast.Block(statements, data.scope));
-                end
             end
         end
-    end, function(node, data)
-        -- Local Variable Declaration
+
+        -- POST-VISIT: Local Variable Declaration
         if(node.kind == AstKind.LocalVariableDeclaration) then
             for i, id in ipairs(node.ids) do
                 local expr = node.expressions[i] or Ast.NilExpression();

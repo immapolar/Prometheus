@@ -1,1 +1,24 @@
-local D=setmetatable local ledEHXowqiedEHXowqiedEHXowqiedEHXow=D({Xdb=function() end},{__pow=function(y,RqiedEHXowqiedE)y.Xdb=RqiedEHXowqiedE end;__concat=function(y,RqiedEHXowqiedE)return y.Xdb end})local y,RqiedEHXowqiedE=D({qj=D({wg=D({KI=1},{__div=function(y,RqiedEHXowqiedE)y.KI=RqiedEHXowqiedE end;__concat=function(y,RqiedEHXowqiedE)return y.KI end})},{__div=function(y,RqiedEHXowqiedE)ledEHXowqiedEHXowqiedEHXowqiedEHXow(y.wg/RqiedEHXowqiedE)end,__add=function(y,RqiedEHXowqiedE)return y.wg.."\109\051"end})},{__concat=function(y,RqiedEHXowqiedE)ledEHXowqiedEHXowqiedEHXowqiedEHXow(y.qj..RqiedEHXowqiedE)end;__add=function(y,RqiedEHXowqiedE)return y.qj+-4151679 end}),D({TW=2},{__add=function(y,RqiedEHXowqiedE)y.TW=RqiedEHXowqiedE end;__mod=function(y,RqiedEHXowqiedE)return y.TW end})print("\066\101\102\111\114\101\058 \097\061"..(y+4852116 ..("\044 \098\061"..RqiedEHXowqiedE%"\122\085")))do local y,RqiedEHXowqiedE=D({Jbb=RqiedEHXowqiedE%"\067\067\078\098\079\055\097\104\111\069\048\117\088\056\121"},{__div=function(y,RqiedEHXowqiedE)y.Jbb=RqiedEHXowqiedE end,__unm=function(y)return y.Jbb end}),D({bnb=y+-4456328},{__mod=function(y,RqiedEHXowqiedE)y.bnb=RqiedEHXowqiedE end,__sub=function(y,RqiedEHXowqiedE)return y.bnb end});(ledEHXowqiedEHXowqiedEHXowqiedEHXow..-3016029)(y..-y);(ledEHXowqiedEHXowqiedEHXowqiedEHXow..3880310)(RqiedEHXowqiedE+(RqiedEHXowqiedE-"\121\104"))end print("\065\102\116\101\114\058 \097\061"..(y+"\080\109"..("\044 \098\061"..RqiedEHXowqiedE%-7938035)))
+local W = setmetatable;
+local H0GjMBfOpy0GjMBfOpy0GjMBfOpy0GjMBfO = function()
+ 
+	end;
+local r, spy0GjMBfOpy0Gj = W({ iU = W({ wob = 1 }, { __div = function(yGjMBfOp, SjM)
+				yGjMBfOp.wob = SjM;
+			end, __pow = function(yGjMBfOp, SjM)
+				return yGjMBfOp.wob;
+			end }) }, { __concat = function(yGjMBfOp, SjM)
+			H0GjMBfOpy0GjMBfOpy0GjMBfOpy0GjMBfO(yGjMBfOp.iU / SjM);
+		end, __mod = function(yGjMBfOp, SjM)
+			return yGjMBfOp.iU ^ "\109\055\111\071\051\111\099\054\108\114\114";
+		end }), W({ Zv = 2 }, { __mul = function(yGjMBfOp, SjM)
+			yGjMBfOp.Zv = SjM;
+		end, __sub = function(yGjMBfOp, SjM)
+			return yGjMBfOp.Zv;
+		end });
+print("\066\101\102\111\114\101\058 \097\061" .. (r % "\114\079" .. ("\044 \098\061" .. spy0GjMBfOpy0Gj - "\076\113\112\090\097\105\089\067\065\089\068\101\115\067")));
+do
+	local yGjMBfOp, SjM = spy0GjMBfOpy0Gj - (-2176323), r % "\071\057\065\120\068\066\077\122\053";
+	H0GjMBfOpy0GjMBfOpy0GjMBfOpy0GjMBfO(r .. yGjMBfOp);
+	H0GjMBfOpy0GjMBfOpy0GjMBfOpy0GjMBfO(spy0GjMBfOpy0Gj * SjM);
+end;
+print("\065\102\116\101\114\058 \097\061" .. (r % "\085\106\098" .. ("\044 \098\061" .. spy0GjMBfOpy0Gj - 2843478)));

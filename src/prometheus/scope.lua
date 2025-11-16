@@ -303,6 +303,29 @@ function Scope:renameVariables(settings)
 				end
 			end
 		end
+
+		-- SHADOW-AWARE RENAMING FIX:
+		-- Prevent shadowing by forbidding ALL variable names from ALL parent scopes.
+		-- Lua's lexical scoping means any local in an inner scope with the same name
+		-- as a local in an outer scope will completely shadow the outer variable,
+		-- making it inaccessible. This breaks transformations that reference parent
+		-- variables from within nested do-blocks.
+		-- Walk up the entire parent chain and collect all variable names.
+		local currentScope = self.parentScope;
+		while currentScope do
+			-- Skip global scope - globals are intentionally shadowable
+			if not currentScope.isGlobal then
+				-- Add ALL active variables from this parent scope to forbidden list
+				for id, name in pairs(currentScope.variables) do
+					-- Only forbid variables that are active (not removed)
+					if name and not currentScope.skipIdLookup[id] then
+						forbiddenNamesLookup[name] = true;
+					end
+				end
+			end
+			-- Move up to next parent
+			currentScope = currentScope.parentScope;
+		end
 		
 		self.variablesLookup = {};
 		
