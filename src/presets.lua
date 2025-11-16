@@ -703,5 +703,82 @@ return {
                 };
             },
         }
-    }
+    };
+
+    -- Diagnostic Seed Tests: Multiple seeds to isolate metamethod failures
+    ["SeedTest1000"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 1000;
+        Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["SeedTest2000"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 2000;
+        Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["SeedTest3000"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 3000;
+        Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["SeedTest4000"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 4000;
+        Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
+    ["SeedTest5000"] = {
+        LuaVersion = "Lua51";
+        VarNamePrefix = "";
+        NameGenerator = "MangledShuffled";
+        PrettyPrint = false;
+        Seed = 5000;
+        Steps = {
+            {
+                Name = "ProxifyLocals";
+                Settings = {
+                    LiteralType = "number";
+                };
+            },
+        }
+    };
 }
