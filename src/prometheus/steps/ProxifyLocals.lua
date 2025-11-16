@@ -161,6 +161,9 @@ local MetatableExpressions = {
     },
 
     -- Indexing Operator (Special - Binary)
+    -- NOTE: __index is EXCLUDED from ProxifyLocals usage (setValue and getValue)
+    -- Reason: Cannot chain through nested proxy levels with different metamethods
+    -- It's only used for the 'index' field (reserved for future use)
     {
         constructor = Ast.IndexExpression,
         key = "__index",
@@ -168,8 +171,9 @@ local MetatableExpressions = {
     },
 }
 
-function ProifyLocals:init(settings)
-	
+function ProifyLocals:init()
+	-- Settings are already applied by Step:new()
+	-- self.LiteralType is already set from SettingsDescriptor
 end
 
 -- Phase 7, Objective 7.1 & 7.2: Dynamic Metamethod Selection with Nested Proxy Chains
@@ -195,15 +199,20 @@ local function generateLocalMetatableInfo(pipeline)
     local binaryOps = {};
     local binaryOpsExcludingIndex = {};  -- For setValue (excluding __index)
     local unaryOps = {};
+    local availableForGetValue = {};  -- For getValue (excluding __index)
     for i, metamethod in ipairs(availableMetamethods) do
         if metamethod.isUnary then
             table.insert(unaryOps, metamethod);
+            -- __index is binary-only, so all unary ops can be used for getValue
+            table.insert(availableForGetValue, metamethod);
         else
             table.insert(binaryOps, metamethod);
-            -- __index cannot be used for setValue (only for getValue)
-            -- setValue requires mutation semantics, but __index is read-only
+            -- __index cannot be used for setValue OR getValue in nested proxies
+            -- setValue: mutation semantics required, __index is read-only
+            -- getValue: cannot chain through inner levels with different metamethods
             if metamethod.key ~= "__index" then
                 table.insert(binaryOpsExcludingIndex, metamethod);
+                table.insert(availableForGetValue, metamethod);
             end
         end
     end
@@ -221,10 +230,10 @@ local function generateLocalMetatableInfo(pipeline)
         usedOps[setValueOp] = true;
         info.setValue = setValueOp;
 
-        -- getValue: Can use binary OR unary operation
+        -- getValue: Can use binary OR unary operation (excluding __index)
         local getValueOp;
         repeat
-            getValueOp = availableMetamethods[math.random(#availableMetamethods)];
+            getValueOp = availableForGetValue[math.random(#availableForGetValue)];
         until not usedOps[getValueOp];
         usedOps[getValueOp] = true;
         info.getValue = getValueOp;
@@ -248,24 +257,14 @@ local function generateLocalMetatableInfo(pipeline)
     return infos;  -- Return ARRAY of info objects
 end
 
--- Phase 7.2: Helper function to get index expression with __index awareness
--- Prevents infinite recursion when __index is used as a metamethod
+-- Phase 7.2: Helper function to get index expression for accessing inner proxy
+-- Returns: self[valueName] to access the inner proxy stored in this level's table
 function ProifyLocals:getIndexExpression(scope, selfVar, info)
-    -- If __index is used as setValue or getValue, use rawget to avoid recursion
-    if info.getValue.key == "__index" or info.setValue.key == "__index" then
-        return Ast.FunctionCallExpression(
-            Ast.VariableExpression(scope:resolveGlobal("rawget")),
-            {
-                Ast.VariableExpression(scope, selfVar),
-                Ast.StringExpression(info.valueName)
-            }
-        );
-    else
-        return Ast.IndexExpression(
-            Ast.VariableExpression(scope, selfVar),
-            Ast.StringExpression(info.valueName)
-        );
-    end
+    -- __index is excluded from setValue and getValue, so simple indexing is safe
+    return Ast.IndexExpression(
+        Ast.VariableExpression(scope, selfVar),
+        Ast.StringExpression(info.valueName)
+    );
 end
 
 -- Phase 7.2: Helper function to create setValue metamethod function for one proxy level
@@ -360,44 +359,25 @@ function ProifyLocals:createGetValueFunction(info, isInnermost, parentScope, pip
             info
         );
 
-        -- Now trigger the inner proxy's getValue metamethod to unwrap it
+        -- Trigger inner proxy's getValue metamethod to unwrap it
         -- This creates the chaining: outer.getValue() -> inner.getValue() -> ... -> actual value
-        local innerValueExpr;
-
-        -- Special case: __index must index the inner proxy with the key argument
-        -- __index expects (table, key) and should chain: return self[valueName][key]
-        if info.getValue.key == "__index" then
-            -- For outer levels with __index: index the inner proxy with the key argument
-            -- This allows the chain to continue: outerProxy[key] -> innerProxy[key] -> ...
-            innerValueExpr = Ast.IndexExpression(indexExpr, Ast.VariableExpression(getValueFunctionScope, getValueArg));
+        -- NOTE: __index is excluded from getValue, so no special handling needed
+        if innerInfo.getValue.isUnary then
+            -- Inner getValue is unary: apply operation directly
+            returnExpr = innerInfo.getValue.constructor(indexExpr);
         else
-            -- For non-__index: trigger inner proxy's getValue to unwrap it
-            -- The THIS level's getValue operation is already being triggered by Lua
-            -- (when user does `var <op> value`), so we only need to unwrap the inner
-            -- value and return it. The operation shouldn't be applied again inside.
-            -- innerValueExpr = indexExpr <innerInfo.getValue.op> <literal>
-            if innerInfo.getValue.isUnary then
-                -- Inner getValue is unary: apply operation directly
-                returnExpr = innerInfo.getValue.constructor(indexExpr);
+            -- Inner getValue is binary: apply with random literal
+            local innerLiteral;
+            if self.LiteralType == "dictionary" then
+                innerLiteral = RandomLiterals.Dictionary();
+            elseif self.LiteralType == "number" then
+                innerLiteral = RandomLiterals.Number();
+            elseif self.LiteralType == "string" then
+                innerLiteral = RandomLiterals.String(pipeline);
             else
-                -- Inner getValue is binary: apply with random literal
-                local innerLiteral;
-                if self.LiteralType == "dictionary" then
-                    innerLiteral = RandomLiterals.Dictionary();
-                elseif self.LiteralType == "number" then
-                    innerLiteral = RandomLiterals.Number();
-                elseif self.LiteralType == "string" then
-                    innerLiteral = RandomLiterals.String(pipeline);
-                else
-                    innerLiteral = RandomLiterals.Any(pipeline);
-                end
-                returnExpr = innerInfo.getValue.constructor(indexExpr, innerLiteral);
+                innerLiteral = RandomLiterals.Any(pipeline);
             end
-        end
-
-        -- For __index case, the returnExpr was set above
-        if info.getValue.key == "__index" then
-            returnExpr = innerValueExpr;
+            returnExpr = innerInfo.getValue.constructor(indexExpr, innerLiteral);
         end
     end
 
@@ -584,22 +564,25 @@ function ProifyLocals:apply(ast, pipeline)
                     --     emptyFunc(c <setValue> temp3)  -- if 'c' is proxified
                     --   end
 
+                    -- Create a NEW child scope for the do-block (proper Lua lexical scoping)
+                    local doBlockScope = Scope:new(data.scope);
+
                     local statements = {};
                     local temps = {};
 
-                    -- Create temporary variables in PARENT scope (not new scope) to prevent shadowing
+                    -- Create temporary variables in do-block scope
                     -- Lua semantics: if #rhs < #lhs, missing values are nil
                     local rhsCount = #node.rhs;
                     for i = 1, #node.lhs do
-                        temps[i] = data.scope:addVariable();  -- Add to PARENT scope
+                        temps[i] = doBlockScope:addVariable();  -- Add to do-block scope
                         -- CRITICAL: Disable proxification for temp variables to prevent corruption
-                        disableMetatableInfo(data.scope, temps[i]);
+                        disableMetatableInfo(doBlockScope, temps[i]);
                     end
 
                     -- Statement 1: Declare temps and assign RHS expressions (preserving Lua parallel evaluation)
                     -- NOTE: At this point, node.rhs has already been transformed by visitast (we're in postvisit)
                     table.insert(statements, Ast.LocalVariableDeclaration(
-                        data.scope,  -- Declare in parent scope to prevent shadowing
+                        doBlockScope,  -- Declare in do-block scope
                         temps,
                         node.rhs  -- All RHS expressions already transformed
                     ));
@@ -607,7 +590,7 @@ function ProifyLocals:apply(ast, pipeline)
                     -- Statement 2...N: Assign each temp to corresponding LHS variable
                     for i = 1, #node.lhs do
                         local lhsInfo = proxifiedLhsInfos[i];
-                        local tempVar = Ast.VariableExpression(data.scope, temps[i]);  -- Reference from parent scope
+                        local tempVar = Ast.VariableExpression(doBlockScope, temps[i]);  -- Reference from do-block scope
 
                         if lhsInfo.isVariable and lhsInfo.infos then
                             -- LHS is proxified: use setValue metamethod
@@ -617,7 +600,7 @@ function ProifyLocals:apply(ast, pipeline)
                             local setExpr = outermostInfo.setValue.constructor(vexp, tempVar);
 
                             self.emptyFunctionUsed = true;
-                            data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
+                            doBlockScope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
 
                             table.insert(statements, Ast.FunctionCallStatement(
                                 Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId),
@@ -632,8 +615,8 @@ function ProifyLocals:apply(ast, pipeline)
                         end
                     end
 
-                    -- Return DoStatement with block using parent scope (temps won't shadow anything)
-                    return Ast.DoStatement(Ast.Block(statements, data.scope));
+                    -- Return DoStatement with proper child scope for do-block
+                    return Ast.DoStatement(Ast.Block(statements, doBlockScope));
             end
         end
 
