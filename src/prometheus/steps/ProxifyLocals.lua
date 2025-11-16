@@ -515,19 +515,97 @@ function ProifyLocals:apply(ast, pipeline)
 
         -- Assignment Statements may be Obfuscated Differently
         if(node.kind == AstKind.AssignmentStatement) then
-            if(#node.lhs == 1 and node.lhs[1].kind == AstKind.AssignmentVariable) then
-                local variable = node.lhs[1];
-                local localMetatableInfos_array = getLocalMetatableInfo(variable.scope, variable.id);
-                if localMetatableInfos_array then
-                    -- Phase 7.2: Use OUTERMOST level's setValue (last in array)
-                    local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
-                    local args = shallowcopy(node.rhs);
-                    local vexp = Ast.VariableExpression(variable.scope, variable.id);
-                    vexp.__ignoreProxifyLocals = true;
-                    args[1] = outermostInfo.setValue.constructor(vexp, args[1]);
-                    self.emptyFunctionUsed = true;
-                    data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
-                    return Ast.FunctionCallStatement(Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId), args);
+            -- First pass: identify which LHS variables are proxified
+            local hasProxifiedVar = false;
+            local proxifiedLhsInfos = {};  -- Maps index to metatable info array (or nil if not proxified)
+
+            for i, lhs in ipairs(node.lhs) do
+                if lhs.kind == AstKind.AssignmentVariable then
+                    local localMetatableInfos_array = getLocalMetatableInfo(lhs.scope, lhs.id);
+                    proxifiedLhsInfos[i] = localMetatableInfos_array;
+                    if localMetatableInfos_array then
+                        hasProxifiedVar = true;
+                    end
+                else
+                    proxifiedLhsInfos[i] = nil;  -- Indexing expressions, not simple variables
+                end
+            end
+
+            -- Only transform if at least one variable is proxified
+            if hasProxifiedVar then
+                -- SINGLE ASSIGNMENT: Use optimized direct transformation
+                if #node.lhs == 1 then
+                    local variable = node.lhs[1];
+                    local localMetatableInfos_array = proxifiedLhsInfos[1];
+                    if localMetatableInfos_array then
+                        -- Phase 7.2: Use OUTERMOST level's setValue (last in array)
+                        local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
+                        local args = shallowcopy(node.rhs);
+                        local vexp = Ast.VariableExpression(variable.scope, variable.id);
+                        vexp.__ignoreProxifyLocals = true;
+                        args[1] = outermostInfo.setValue.constructor(vexp, args[1]);
+                        self.emptyFunctionUsed = true;
+                        data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
+                        return Ast.FunctionCallStatement(Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId), args);
+                    end
+                else
+                    -- MULTIPLE ASSIGNMENT: Transform to do-block with temporaries
+                    -- Original: a, b, c = expr1, expr2, expr3
+                    -- Transform to:
+                    --   do
+                    --     local temp1, temp2, temp3 = expr1, expr2, expr3
+                    --     emptyFunc(a <setValue> temp1)  -- if 'a' is proxified
+                    --     b = temp2                      -- if 'b' is not proxified
+                    --     emptyFunc(c <setValue> temp3)  -- if 'c' is proxified
+                    --   end
+
+                    local statements = {};
+                    local temps = {};
+
+                    -- Create temporary variables in PARENT scope (not new scope) to prevent shadowing
+                    -- Lua semantics: if #rhs < #lhs, missing values are nil
+                    local rhsCount = #node.rhs;
+                    for i = 1, #node.lhs do
+                        temps[i] = data.scope:addVariable();  -- Add to PARENT scope
+                    end
+
+                    -- Statement 1: Declare temps and assign RHS expressions (preserving Lua parallel evaluation)
+                    table.insert(statements, Ast.LocalVariableDeclaration(
+                        data.scope,  -- Declare in parent scope to prevent shadowing
+                        temps,
+                        node.rhs  -- All RHS expressions evaluated in parallel
+                    ));
+
+                    -- Statement 2...N: Assign each temp to corresponding LHS variable
+                    for i, lhs in ipairs(node.lhs) do
+                        local localMetatableInfos_array = proxifiedLhsInfos[i];
+                        local tempVar = Ast.VariableExpression(data.scope, temps[i]);  -- Reference from parent scope
+
+                        if localMetatableInfos_array then
+                            -- LHS is proxified: use setValue metamethod
+                            local outermostInfo = localMetatableInfos_array[#localMetatableInfos_array];
+                            local vexp = Ast.VariableExpression(lhs.scope, lhs.id);
+                            vexp.__ignoreProxifyLocals = true;
+                            local setExpr = outermostInfo.setValue.constructor(vexp, tempVar);
+
+                            self.emptyFunctionUsed = true;
+                            data.scope:addReferenceToHigherScope(self.emptyFunctionScope, self.emptyFunctionId);
+
+                            table.insert(statements, Ast.FunctionCallStatement(
+                                Ast.VariableExpression(self.emptyFunctionScope, self.emptyFunctionId),
+                                {setExpr}
+                            ));
+                        else
+                            -- LHS is not proxified (or is indexing expression): direct assignment
+                            table.insert(statements, Ast.AssignmentStatement(
+                                {lhs},
+                                {tempVar}
+                            ));
+                        end
+                    end
+
+                    -- Return DoStatement with block using parent scope (temps won't shadow anything)
+                    return Ast.DoStatement(Ast.Block(statements, data.scope));
                 end
             end
         end

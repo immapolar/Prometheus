@@ -1,72 +1,88 @@
-local SjzaMU18gwjzaMU = setmetatable;
-local P = SjzaMU18gwjzaMU({ lr = SjzaMU18gwjzaMU({ Dx = SjzaMU18gwjzaMU({ fD = SjzaMU18gwjzaMU({ kO = function()
+local TqXvieZbQ8qXvie = setmetatable;
+local W = TqXvieZbQ8qXvie({ lr = TqXvieZbQ8qXvie({ Dx = TqXvieZbQ8qXvie({ fD = TqXvieZbQ8qXvie({ kO = function()
  
-					end }, { __sub = function(s, SjzaMU18gwjzaMU)
-						s.kO = SjzaMU18gwjzaMU;
-					end, __index = function(s, SjzaMU18gwjzaMU)
-						return rawget(s, "\107\079");
-					end }) }, { __concat = function(s, SjzaMU18gwjzaMU)
-					P(rawget(s, "\102\068") .. SjzaMU18gwjzaMU);
-				end, __index = function(s, SjzaMU18gwjzaMU)
-					return (rawget(s, "\102\068"))[SjzaMU18gwjzaMU];
-				end }) }, { __mul = function(s, SjzaMU18gwjzaMU)
-				P(s.Dx * SjzaMU18gwjzaMU);
-			end, __mod = function(s, SjzaMU18gwjzaMU)
-				return s.Dx[-1071905];
-			end }) }, { __mod = function(s, SjzaMU18gwjzaMU)
-			P(s.lr % SjzaMU18gwjzaMU);
-		end, __concat = function(s, SjzaMU18gwjzaMU)
-			return s.lr % "\111\116";
+					end }, { __sub = function(P, TqXvieZbQ8qXvie)
+						P.kO = TqXvieZbQ8qXvie;
+					end, __index = function(P, TqXvieZbQ8qXvie)
+						return rawget(P, "\107\079");
+					end }) }, { __concat = function(P, TqXvieZbQ8qXvie)
+					W(rawget(P, "\102\068") .. TqXvieZbQ8qXvie);
+				end, __index = function(P, TqXvieZbQ8qXvie)
+					return (rawget(P, "\102\068"))[TqXvieZbQ8qXvie];
+				end }) }, { __mul = function(P, TqXvieZbQ8qXvie)
+				W(P.Dx * TqXvieZbQ8qXvie);
+			end, __mod = function(P, TqXvieZbQ8qXvie)
+				return P.Dx[-1071905];
+			end }) }, { __mod = function(P, TqXvieZbQ8qXvie)
+			W(P.lr % TqXvieZbQ8qXvie);
+		end, __concat = function(P, TqXvieZbQ8qXvie)
+			return P.lr % "\111\116";
 		end });
-local s = SjzaMU18gwjzaMU({ kR = SjzaMU18gwjzaMU({ J1 = SjzaMU18gwjzaMU({ e9 = SjzaMU18gwjzaMU({ ST = function(s)
-						local UaMU18gwjzaMU18gwjzaMU18gwjzaMU18gw, VMU18gwj = SjzaMU18gwjzaMU({ Ebb = SjzaMU18gwjzaMU({ Ke = SjzaMU18gwjzaMU({ lmb = SjzaMU18gwjzaMU({ rv = 0 }, { __div = function(s, SjzaMU18gwjzaMU)
-												s.rv = SjzaMU18gwjzaMU;
-											end, __pow = function(s, SjzaMU18gwjzaMU)
-												return s.rv;
-											end }) }, { __mod = function(s, SjzaMU18gwjzaMU)
-											P(rawget(s, "\108\109\098") % SjzaMU18gwjzaMU);
-										end, __index = function(s, SjzaMU18gwjzaMU)
-											return (rawget(s, "\108\109\098"))[SjzaMU18gwjzaMU];
-										end }) }, { __mul = function(s, SjzaMU18gwjzaMU)
-										P(s.Ke * SjzaMU18gwjzaMU);
-									end, __unm = function(s)
-										return s.Ke.z3;
-									end }) }, { __sub = function(s, SjzaMU18gwjzaMU)
-									P(s.Ebb - SjzaMU18gwjzaMU);
-								end, __mul = function(s, SjzaMU18gwjzaMU)
-									return -s.Ebb;
-								end }), SjzaMU18gwjzaMU({ GU = SjzaMU18gwjzaMU({ Jab = SjzaMU18gwjzaMU({ kcb = 1 }, { __mod = function(s, SjzaMU18gwjzaMU)
-											s.kcb = SjzaMU18gwjzaMU;
-										end, __add = function(s, SjzaMU18gwjzaMU)
-											return s.kcb;
-										end }) }, { __mod = function(s, SjzaMU18gwjzaMU)
-										P(s.Jab % SjzaMU18gwjzaMU);
-									end, __sub = function(s, SjzaMU18gwjzaMU)
-										return s.Jab + "\098\112\068\073\087\084\102\098\098\119\081\057\120\114\072";
-									end }) }, { __concat = function(s, SjzaMU18gwjzaMU)
-									P(s.GU .. SjzaMU18gwjzaMU);
-								end, __add = function(s, SjzaMU18gwjzaMU)
-									return s.GU - "\084\101\098";
+local P = TqXvieZbQ8qXvie({ P7 = TqXvieZbQ8qXvie({ yt = function(P)
+				local tvieZbQ8qXvieZbQ8qXvieZbQ8qXvieZbQ8, dieZbQ8q = TqXvieZbQ8qXvie({ Ebb = TqXvieZbQ8qXvie({ Ke = TqXvieZbQ8qXvie({ lmb = TqXvieZbQ8qXvie({ rv = 0 }, { __div = function(P, TqXvieZbQ8qXvie)
+										P.rv = TqXvieZbQ8qXvie;
+									end, __pow = function(P, TqXvieZbQ8qXvie)
+										return P.rv;
+									end }) }, { __mod = function(P, TqXvieZbQ8qXvie)
+									W(rawget(P, "\108\109\098") % TqXvieZbQ8qXvie);
+								end, __index = function(P, TqXvieZbQ8qXvie)
+									return (rawget(P, "\108\109\098"))[TqXvieZbQ8qXvie];
+								end }) }, { __mul = function(P, TqXvieZbQ8qXvie)
+								W(P.Ke * TqXvieZbQ8qXvie);
+							end, __unm = function(P)
+								return P.Ke.z3;
+							end }) }, { __sub = function(P, TqXvieZbQ8qXvie)
+							W(P.Ebb - TqXvieZbQ8qXvie);
+						end, __mul = function(P, TqXvieZbQ8qXvie)
+							return -P.Ebb;
+						end }), TqXvieZbQ8qXvie({ GU = TqXvieZbQ8qXvie({ Jab = TqXvieZbQ8qXvie({ kcb = 1 }, { __mod = function(P, TqXvieZbQ8qXvie)
+									P.kcb = TqXvieZbQ8qXvie;
+								end, __add = function(P, TqXvieZbQ8qXvie)
+									return P.kcb;
+								end }) }, { __mod = function(P, TqXvieZbQ8qXvie)
+								W(P.Jab % TqXvieZbQ8qXvie);
+							end, __sub = function(P, TqXvieZbQ8qXvie)
+								return P.Jab + "\098\112\068\073\087\084\102\098\098\119\081\057\120\114\072";
+							end }) }, { __concat = function(P, TqXvieZbQ8qXvie)
+							W(P.GU .. TqXvieZbQ8qXvie);
+						end, __add = function(P, TqXvieZbQ8qXvie)
+							return P.GU - "\084\101\098";
+						end });
+				while tvieZbQ8qXvieZbQ8qXvieZbQ8qXvieZbQ8 * 1476909 < P do
+					print(tvieZbQ8qXvieZbQ8qXvieZbQ8qXvieZbQ8 * 6075321);
+					do
+						local P, SeZ = TqXvieZbQ8qXvie({ kR = TqXvieZbQ8qXvie({ J1 = TqXvieZbQ8qXvie({ e9 = TqXvieZbQ8qXvie({ ST = dieZbQ8q + 7705067 }, { __mul = function(P, TqXvieZbQ8qXvie)
+												P.ST = TqXvieZbQ8qXvie;
+											end, __div = function(P, TqXvieZbQ8qXvie)
+												return P.ST;
+											end }) }, { __div = function(P, TqXvieZbQ8qXvie)
+											W(P.e9 / TqXvieZbQ8qXvie);
+										end, __unm = function(P)
+											return P.e9 / "\086\084";
+										end }) }, { __mul = function(P, TqXvieZbQ8qXvie)
+										W(P.J1 * TqXvieZbQ8qXvie);
+									end, __add = function(P, TqXvieZbQ8qXvie)
+										return -P.J1;
+									end }) }, { __pow = function(P, TqXvieZbQ8qXvie)
+									W(P.kR ^ TqXvieZbQ8qXvie);
+								end, __sub = function(P, TqXvieZbQ8qXvie)
+									return P.kR + "\102\090";
+								end }), TqXvieZbQ8qXvie({ f2 = tvieZbQ8qXvieZbQ8qXvieZbQ8qXvieZbQ8 * 3071837 + (dieZbQ8q + "\072\072") }, { __sub = function(P, TqXvieZbQ8qXvie)
+									P.f2 = TqXvieZbQ8qXvie;
+								end, __pow = function(P, TqXvieZbQ8qXvie)
+									return P.f2;
 								end });
-						while UaMU18gwjzaMU18gwjzaMU18gwjzaMU18gw * 1476909 < s do
-							print(UaMU18gwjzaMU18gwjzaMU18gwjzaMU18gw * 6075321);
-							UaMU18gwjzaMU18gwjzaMU18gwjzaMU18gw.Ebb, VMU18gwj.GU = VMU18gwj + 7705067, UaMU18gwjzaMU18gwjzaMU18gwjzaMU18gw * 3071837 + (VMU18gwj + "\072\072");
-						end;
-					end }, { __mul = function(s, SjzaMU18gwjzaMU)
-						s.ST = SjzaMU18gwjzaMU;
-					end, __div = function(s, SjzaMU18gwjzaMU)
-						return s.ST;
-					end }) }, { __div = function(s, SjzaMU18gwjzaMU)
-					P(s.e9 / SjzaMU18gwjzaMU);
-				end, __unm = function(s)
-					return s.e9 / "\086\084";
-				end }) }, { __mul = function(s, SjzaMU18gwjzaMU)
-				P(s.J1 * SjzaMU18gwjzaMU);
-			end, __add = function(s, SjzaMU18gwjzaMU)
-				return -s.J1;
-			end }) }, { __pow = function(s, SjzaMU18gwjzaMU)
-			P(s.kR ^ SjzaMU18gwjzaMU);
-		end, __sub = function(s, SjzaMU18gwjzaMU)
-			return s.kR + "\102\090";
+						(W .. "\106\115")(tvieZbQ8qXvieZbQ8qXvieZbQ8qXvieZbQ8 - (P - "\118\097\083\074\052\066\111\108\077\121\069\084\086\089"));
+						(W .. -2865496)(dieZbQ8q .. SeZ ^ "\110\073\074\077\107\076\106\057\077");
+					end;
+				end;
+			end }, { __mod = function(P, TqXvieZbQ8qXvie)
+				P.yt = TqXvieZbQ8qXvie;
+			end, __sub = function(P, TqXvieZbQ8qXvie)
+				return P.yt;
+			end }) }, { __sub = function(P, TqXvieZbQ8qXvie)
+			W(P.P7 - TqXvieZbQ8qXvie);
+		end, __add = function(P, TqXvieZbQ8qXvie)
+			return P.P7 - (-4202369);
 		end });
-(s - "\068\110")(1000);
+(P + "\100\104\065\087")(1000);
