@@ -242,6 +242,94 @@ function Pipeline:getLuaVersion()
 	return self.luaVersion;
 end
 
+-- Ideal Step Ordering System
+-- This function defines the optimal execution order for all obfuscation steps
+-- to ensure maximum compatibility and prevent step interaction issues.
+-- Steps are automatically reordered regardless of user input or preset configuration.
+function Pipeline:getIdealStepOrder()
+	-- The ideal order is based on extensive compatibility testing and analysis
+	-- of step dependencies, transformations, and interactions.
+	--
+	-- Key principles:
+	-- 1. String operations (EncryptStrings, SplitStrings) come first
+	-- 2. ProxifyLocals comes before VM/Array transformations
+	-- 3. NumbersToExpressions MUST come after ProxifyLocals but before Vmify/ConstantArray
+	--    (This prevents NumbersToExpressions from corrupting VM opcodes and array indices)
+	-- 4. Structural transformations (Vmify, ConstantArray) come late
+	-- 5. Wrapping operations (WrapInFunction) come last
+	--
+	-- This ordering is ENFORCED automatically and cannot be overridden.
+
+	return {
+		"Encrypt Strings",        -- 1. Encrypt string literals early
+		"Split Strings",          -- 2. Split strings (string operations together)
+		"Anti Tamper",            -- 3. Add anti-tamper checks early
+		"Dead Code Injection",    -- 4. Inject dead code before obfuscation
+		"Statement Shuffle",      -- 5. Shuffle statements before structural changes
+		"Proxify Locals",         -- 6. Wrap locals in proxy structures
+		"Numbers To Expressions", -- 7. CRITICAL: After ProxifyLocals, before Vmify/ConstantArray
+		"Vmify",                  -- 8. VM transformation (generates many numbers)
+		"Constant Array",         -- 9. Extract constants to arrays
+		"Add Vararg",             -- 10. Add vararg parameters
+		"Watermark Check",        -- 11. Add watermark verification
+		"Wrap in Function",       -- 12. Final function wrapping
+	};
+end
+
+-- Reorder Steps to Ideal Execution Order
+-- This function automatically reorders all added steps to the ideal order
+-- regardless of how they were specified (preset, CLI, or programmatic).
+-- Steps not in the ideal order list are placed at the end in their original order.
+function Pipeline:reorderSteps()
+	if #self.steps == 0 then
+		return; -- No steps to reorder
+	end
+
+	local idealOrder = self:getIdealStepOrder();
+
+	-- Create a lookup table for ideal positions (step name -> position)
+	local idealPositions = {};
+	for i, stepName in ipairs(idealOrder) do
+		idealPositions[stepName] = i;
+	end
+
+	-- Create a table to hold steps with their ideal positions
+	local stepsWithPositions = {};
+	for i, step in ipairs(self.steps) do
+		local stepName = step.Name or "Unnamed";
+		local idealPosition = idealPositions[stepName] or (1000 + i); -- Unknown steps go to end
+		table.insert(stepsWithPositions, {
+			step = step,
+			idealPosition = idealPosition,
+			originalPosition = i,
+		});
+	end
+
+	-- Sort steps by their ideal position
+	table.sort(stepsWithPositions, function(a, b)
+		if a.idealPosition ~= b.idealPosition then
+			return a.idealPosition < b.idealPosition;
+		else
+			-- If same ideal position (shouldn't happen), maintain original order
+			return a.originalPosition < b.originalPosition;
+		end
+	end);
+
+	-- Rebuild the steps table in ideal order
+	local reorderedSteps = {};
+	for i, entry in ipairs(stepsWithPositions) do
+		table.insert(reorderedSteps, entry.step);
+	end
+
+	self.steps = reorderedSteps;
+
+	-- Log the reordering for transparency
+	logger:info("Steps automatically reordered to ideal execution order:");
+	for i, step in ipairs(self.steps) do
+		logger:info(string.format("  %d. %s", i, step.Name or "Unnamed"));
+	end
+end
+
 function Pipeline:setNameGenerator(nameGenerator)
 	if(type(nameGenerator) == "string") then
 		nameGenerator = Pipeline.NameGenerators[nameGenerator];
@@ -312,6 +400,11 @@ function Pipeline:apply(code, filename)
 	-- Apply setting randomization after entropy seeding
 	-- This ensures each file gets unique randomization based on its entropy
 	self:randomizeStepSettings();
+
+	-- CRITICAL: Reorder steps to ideal execution order
+	-- This ensures maximum compatibility regardless of user input or preset configuration
+	-- Must be called after randomizeStepSettings() but before parsing
+	self:reorderSteps();
 
 	logger:info("Parsing ...");
 	local parserStartTime = gettime();

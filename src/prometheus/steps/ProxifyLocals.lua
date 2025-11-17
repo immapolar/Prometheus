@@ -438,6 +438,12 @@ function ProifyLocals:apply(ast, pipeline)
         -- Global Variables should not be transformed
         if(scope.isGlobal) then return nil end;
 
+        -- EncryptStrings Compatibility: Check if variable is marked as do not proxify
+        -- EncryptStrings marks DECRYPT and STRINGS variables to prevent proxification
+        if scope.doNotProxify and scope.doNotProxify[id] then
+            return nil
+        end
+
         localMetatableInfos[scope] = localMetatableInfos[scope] or {};
         if localMetatableInfos[scope][id] then
             -- If locked, return no Metatable

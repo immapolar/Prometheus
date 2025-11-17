@@ -647,6 +647,34 @@ function NumbersToExpressions:apply(ast, pipeline)
 	self.pipeline = pipeline;
 	self.globalScope = ast.globalScope;
 
+	-- ProxifyLocals Compatibility Fix: Filter unsafe generators
+	-- When ProxifyLocals is active, many expression generators become incompatible
+	-- due to floating-point precision loss, scope dependencies, and type constraints.
+	-- Only generators 1-4 (integer arithmetic) and 7 (bitwise XOR) are safe.
+	local needsSafeGenerators = false;
+	if pipeline.steps then
+		for _, step in ipairs(pipeline.steps) do
+			if step.Name == "Proxify Locals" or step.Name == "ProxifyLocals" then
+				needsSafeGenerators = true;
+				break;
+			end
+		end
+	end
+
+	if needsSafeGenerators then
+		-- Use ONLY safe generators (1, 2, 3, 4, 7)
+		-- Disable unsafe generators: 5, 6, 8, 9, 10, 11, 12, 13, 14, 15
+		-- This ensures exact numeric precision required for ProxifyLocals metamethod arguments
+		local allGenerators = self.ExpressionGenerators;
+		self.ExpressionGenerators = {
+			allGenerators[1],  -- Generator 1: Addition
+			allGenerators[2],  -- Generator 2: Subtraction
+			allGenerators[3],  -- Generator 3: Addition Chain
+			allGenerators[4],  -- Generator 4: Subtraction Chain
+			allGenerators[7],  -- Generator 7: Bitwise XOR (Lua 5.4 only)
+		};
+	end
+
 	-- Phase 5, Objective 5.2: Polymorphic Expression Trees
 	-- Randomize expression tree characteristics per file for uniqueness
 	-- These settings are consistent within a file but vary across files

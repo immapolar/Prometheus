@@ -57,33 +57,15 @@ function BlumBlumShub.createEncryptor()
 		return seed;
 	end
 
-	local function get_random_32()
+	-- FIXED: Single state update per byte for deterministic synchronization
+	-- This ensures encryption and decryption generate identical random byte sequences
+	local function get_next_pseudo_random_byte()
 		-- Blum Blum Shub: x_{n+1} = (x_n)^2 mod M
+		-- Single squaring per call prevents precision loss accumulation
 		state = (state * state) % modulus;
 
-		-- Extract multiple bits by repeated squaring
-		local output = state;
-		for i = 1, 3 do
-			state = (state * state) % modulus;
-			output = (output * 256 + state) % 4294967296;
-		end
-
-		return output;
-	end
-
-	local prev_values = {}
-	local function get_next_pseudo_random_byte()
-		if #prev_values == 0 then
-			local rnd = get_random_32() -- value 0..4294967295
-			local low_16 = rnd % 65536
-			local high_16 = (rnd - low_16) / 65536
-			local b1 = low_16 % 256
-			local b2 = (low_16 - b1) / 256
-			local b3 = high_16 % 256
-			local b4 = (high_16 - b3) / 256
-			prev_values = { b1, b2, b3, b4 }
-		end
-		return table.remove(prev_values)
+		-- Extract low byte (least significant 8 bits)
+		return state % 256;
 	end
 
 	local function encrypt(str)
@@ -121,25 +103,9 @@ do
 		charmap[n] = char(n - 1);
 	until #nums == 0;
 
-	local prev_values = {}
 	local function get_next_pseudo_random_byte()
-		if #prev_values == 0 then
-			state = (state * state) % ]] .. tostring(modulus) .. [[;
-			local output = state;
-			for i = 1, 3 do
-				state = (state * state) % ]] .. tostring(modulus) .. [[;
-				output = (output * 256 + state) % 4294967296;
-			end
-			local rnd = output;
-			local low_16 = rnd % 65536
-			local high_16 = (rnd - low_16) / 65536
-			local b1 = low_16 % 256
-			local b2 = (low_16 - b1) / 256
-			local b3 = high_16 % 256
-			local b4 = (high_16 - b3) / 256
-			prev_values = { b1, b2, b3, b4 }
-		end
-		return table.remove(prev_values)
+		state = (state * state) % ]] .. tostring(modulus) .. [[;
+		return state % 256;
 	end
 
 	local realStrings = {};
@@ -150,7 +116,6 @@ do
 	function DECRYPT(str, seed)
 		local realStringsLocal = realStrings;
 		if(realStringsLocal[seed]) then else
-			prev_values = {};
 			local chars = charmap;
 			state = (seed % ]] .. tostring(modulus - 1) .. [[) + 1;
 			local len = string.len(str);

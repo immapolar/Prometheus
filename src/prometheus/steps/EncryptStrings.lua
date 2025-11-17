@@ -90,6 +90,13 @@ function EncryptStrings:apply(ast, pipeline)
 	local decryptVar = scope:addVariable();
 	local stringsVar = scope:addVariable();
 
+	-- ProxifyLocals Compatibility: Mark these variables as do not proxify
+	-- These are internal decryption machinery variables that must not be proxified
+	-- ProxifyLocals will check scope.doNotProxify[id] and skip these variables
+	scope.doNotProxify = scope.doNotProxify or {};
+	scope.doNotProxify[decryptVar] = true;
+	scope.doNotProxify[stringsVar] = true;
+
 	doStat.body.scope:setParent(ast.body.scope);
 
 	visitast(newAst, nil, function(node, data)

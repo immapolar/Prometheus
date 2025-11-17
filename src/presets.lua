@@ -135,6 +135,13 @@ return {
                 }
             },
             {
+                Name = "NumbersToExpressions";
+                Settings = {
+                    -- Moved BEFORE Vmify/ConstantArray for compatibility
+                    -- This prevents NumbersToExpressions from corrupting VM opcodes and array indices
+                }
+            },
+            {
                 Name = "Vmify";
                 Settings = {
 
@@ -148,12 +155,6 @@ return {
                     Shuffle     = true;
                     Rotate      = true;
                     LocalWrapperTreshold = 0;
-                }
-            },
-            {
-                Name = "NumbersToExpressions";
-                Settings = {
-
                 }
             },
             {
