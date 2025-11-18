@@ -397,39 +397,6 @@ Implement 15 expression generators to maximize expression diversity per number l
 
 ### **Phase 6: Variable Name Polymorphism**
 
-#### **Objective 6.1: Per-File Name Generation Algorithms**
-**Problem**: Name generators use fixed character sets and patterns.
-
-**Solution**:
-Implement 8 name generator variants (randomly selected per file):
-
-1. **Mangled Shuffled** (Current)
-2. **Unicode Confusables** - Visually similar Unicode chars (Α vs A)
-3. **Homoglyph Generator** - Mixed scripts (Cyrillic + Latin)
-4. **Emoji-Based** - Valid Lua identifiers using emoji (Lua 5.4)
-5. **Random Dictionary Words** - Pronounceable but meaningless
-6. **Fibonacci Encoding** - Names based on Fibonacci sequence
-7. **Prime-Based** - Names generated from prime factorization
-8. **Hash-Derived** - Names from hashing scope + variable index
-
-**Implementation**:
-- `src/prometheus/namegenerators/` directory - add new generators
-- Random generator selection per file
-- Per-scope randomization (different scopes use different generators)
-
-**Files to Create**:
-- `src/prometheus/namegenerators/unicode_confusables.lua`
-- `src/prometheus/namegenerators/homoglyph.lua`
-- `src/prometheus/namegenerators/emoji.lua`
-- `src/prometheus/namegenerators/dictionary.lua`
-- `src/prometheus/namegenerators/fibonacci.lua`
-- `src/prometheus/namegenerators/prime.lua`
-- `src/prometheus/namegenerators/hash_derived.lua`
-
-**Success Metric**: Variable names from different files show no pattern correlation.
-
----
-
 #### **Objective 6.2: Dynamic Name Length Distribution**
 **Problem**: Name lengths follow predictable patterns.
 
@@ -737,7 +704,7 @@ Implement 8 name generator variants (randomly selected per file):
 
 ### **High Priority** (Major Uniqueness Contributors)
 5. Phase 3: Constant Array Polymorphism - **Objective 3.1 & 3.2**
-6. Phase 6: Variable Name Polymorphism - **Objective 6.1 & 6.2**
+6. Phase 6: Variable Name Polymorphism - **Objective 6.2**
 7. Phase 4: Control Flow Transformation - **Objective 4.1 & 4.2**
 
 ### **Medium Priority** (Uniqueness Enhancers)
@@ -904,14 +871,6 @@ Prometheus/
 │   │   │   ├── StatementShuffle.lua             # Phase 9
 │   │   │   ├── DeadCodeInjection.lua            # Phase 9
 │   │   │   └── SignaturePoisoning.lua           # Phase 11
-│   │   ├── namegenerators/
-│   │   │   ├── unicode_confusables.lua          # Phase 6
-│   │   │   ├── homoglyph.lua                    # Phase 6
-│   │   │   ├── emoji.lua                        # Phase 6
-│   │   │   ├── dictionary.lua                   # Phase 6
-│   │   │   ├── fibonacci.lua                    # Phase 6
-│   │   │   ├── prime.lua                        # Phase 6
-│   │   │   └── hash_derived.lua                 # Phase 6
 │   │   └── signatures/                          # Phase 11
 │   │       ├── luraph.lua
 │   │       ├── ironbrew.lua
