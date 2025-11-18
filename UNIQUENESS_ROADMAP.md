@@ -657,30 +657,6 @@ Implement 8 name generator variants (randomly selected per file):
 
 ### **Phase 10: Preset Randomization**
 
-#### **Objective 10.1: Dynamic Step Ordering**
-**Problem**: Obfuscation steps execute in fixed order per preset.
-
-**Solution**:
-- Randomize step execution order per file (where dependencies allow):
-  - Define step dependency graph
-  - Generate random topological sort
-  - Different files get different step orders
-- Randomize step selection (enable/disable steps randomly within constraints)
-- Random step setting variations
-
-**Implementation**:
-- `src/prometheus/pipeline.lua`: Add step dependency system
-- Random topological ordering
-- Step selection randomization
-
-**Files to Modify**:
-- `src/prometheus/pipeline.lua`
-- `src/presets.lua`
-
-**Success Metric**: Step execution order varies across files with same preset.
-
----
-
 #### **Objective 10.2: Per-File Step Configuration** ✅ **COMPLETED**
 **Problem**: Step settings are consistent across files with same preset.
 
@@ -816,7 +792,7 @@ Create `uniqueness_analyzer.lua` tool that:
 ### **Medium Priority** (Uniqueness Enhancers)
 8. Phase 7: Metatable Polymorphism - **Objective 7.1 & 7.2**
 9. Phase 9: Code Structure Randomization - **Objective 9.1 & 9.2**
-10. Phase 10: Preset Randomization - **Objective 10.1 & 10.2**
+10. Phase 10: Preset Randomization - **Objective 10.2**
 
 ### **Low Priority** (Polishing & Anti-Analysis)
 11. Phase 11: Anti-Pattern-Analysis Features - **Objective 11.1 & 11.2**
