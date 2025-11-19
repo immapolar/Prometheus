@@ -84,10 +84,15 @@ ConstantArray.SettingsDescriptor = {
 		name = "Encoding",
 		description = "The Encoding to use for the Strings",
 		type = "enum",
-		default = "base64",
+		default = "random",
 		values = {
 			"none",
+			"random",
 			"base64",
+			"base85",
+			"hex",
+			"rle",
+			"hybrid",
 		},
 	}
 }
@@ -207,64 +212,69 @@ function ConstantArray:addRotateCode(ast, shift)
 end
 
 function ConstantArray:addDecodeCode(ast)
-	if self.Encoding == "base64" then
-		local base64DecodeCode = [[
-	do ]] .. table.concat(util.shuffle{
-		"local lookup = LOOKUP_TABLE;",
-		"local len = string.len;",
-		"local sub = string.sub;",
-		"local floor = math.floor;",
-		"local strchar = string.char;",
-		"local insert = table.insert;",
-		"local concat = table.concat;",
-		"local type = type;",
-		"local arr = ARR;",
-	}) .. [[
-		for i = 1, #arr do
-			local data = arr[i];
-			if type(data) == "string" then
-				local length = len(data)
-				local parts = {}
-				local index = 1
-				local value = 0
-				local count = 0
-				while index <= length do
-					local char = sub(data, index, index)
-					local code = lookup[char]
-					if code then
-						value = value + code * (64 ^ (3 - count))
-						count = count + 1
-						if count == 4 then
-							count = 0
-							local c1 = floor(value / 65536)
-							local c2 = floor(value % 65536 / 256)
-							local c3 = value % 256
-							insert(parts, strchar(c1, c2, c3))
-							value = 0
-						end
-					elseif char == "=" then
-						insert(parts, strchar(floor(value / 65536)));
-						if index >= length or sub(data, index + 1, index + 1) ~= "=" then
-							insert(parts, strchar(floor(value % 65536 / 256)));
-						end
-						break
-					end
-					index = index + 1
-				end
-				arr[i] = concat(parts)
-			end
-		end
+	if not self.encoding or not self.encoding.getDecoderCode then
+		return;
 	end
-]];
 
-		local parser = Parser:new({
-			LuaVersion = LuaVersion.Lua51;
-		});
+	local decodeCode = self.encoding.getDecoderCode();
 
-		local newAst = parser:parse(base64DecodeCode);
-		local forStat = newAst.body.statements[1];
-		forStat.body.scope:setParent(ast.body.scope);
+	local parser = Parser:new({
+		LuaVersion = LuaVersion.Lua51;
+	});
 
+	local newAst = parser:parse(decodeCode);
+	local forStat = newAst.body.statements[1];
+	forStat.body.scope:setParent(ast.body.scope);
+
+	-- Handle Hybrid encoding with multiple lookups
+	if self.encoding.name == "Hybrid" then
+		local lookups = self.encoding.createLookups();
+		visitast(newAst, nil, function(node, data)
+			if(node.kind == AstKind.VariableExpression) then
+				if(node.scope:getVariableName(node.id) == "ARR") then
+					data.scope:removeReferenceToHigherScope(node.scope, node.id);
+					data.scope:addReferenceToHigherScope(self.rootScope, self.arrId);
+					node.scope = self.rootScope;
+					node.id    = self.arrId;
+				end
+
+				if(node.scope:getVariableName(node.id) == "LOOKUP1") then
+					data.scope:removeReferenceToHigherScope(node.scope, node.id);
+					return lookups[1];
+				end
+				if(node.scope:getVariableName(node.id) == "LOOKUP2") then
+					data.scope:removeReferenceToHigherScope(node.scope, node.id);
+					return lookups[2];
+				end
+				if(node.scope:getVariableName(node.id) == "LOOKUP3") then
+					data.scope:removeReferenceToHigherScope(node.scope, node.id);
+					return lookups[3];
+				end
+				if(node.scope:getVariableName(node.id) == "LOOKUP4") then
+					data.scope:removeReferenceToHigherScope(node.scope, node.id);
+					return lookups[4];
+				end
+			end
+		end);
+	-- Handle RLE encoding with escape character
+	elseif self.encoding.name == "Run-Length Encoding" then
+		visitast(newAst, nil, function(node, data)
+			if(node.kind == AstKind.VariableExpression) then
+				if(node.scope:getVariableName(node.id) == "ARR") then
+					data.scope:removeReferenceToHigherScope(node.scope, node.id);
+					data.scope:addReferenceToHigherScope(self.rootScope, self.arrId);
+					node.scope = self.rootScope;
+					node.id    = self.arrId;
+				end
+
+				if(node.scope:getVariableName(node.id) == "ESCAPE_CHAR") then
+					data.scope:removeReferenceToHigherScope(node.scope, node.id);
+					return self.encoding.createEscapeChar();
+				end
+			end
+		end);
+	-- Handle standard encodings with lookup table
+	else
 		visitast(newAst, nil, function(node, data)
 			if(node.kind == AstKind.VariableExpression) then
 				if(node.scope:getVariableName(node.id) == "ARR") then
@@ -276,13 +286,13 @@ function ConstantArray:addDecodeCode(ast)
 
 				if(node.scope:getVariableName(node.id) == "LOOKUP_TABLE") then
 					data.scope:removeReferenceToHigherScope(node.scope, node.id);
-					return self:createBase64Lookup();
+					return self.encoding.createLookup();
 				end
 			end
-		end)
-	
-		table.insert(ast.body.statements, 1, forStat);
+		end);
 	end
+
+	table.insert(ast.body.statements, 1, forStat);
 end
 
 function ConstantArray:createBase64Lookup()
@@ -297,30 +307,44 @@ function ConstantArray:createBase64Lookup()
 end
 
 function ConstantArray:encode(str)
-	if self.Encoding == "base64" then
-		return ((str:gsub('.', function(x) 
-			local r,b='',x:byte()
-			for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and '1' or '0') end
-			return r;
-		end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
-			if (#x < 6) then return '' end
-			local c=0
-			for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end
-			return self.base64chars:sub(c+1,c+1)
-		end)..({ '', '==', '=' })[#str%3+1]);
+	if self.encoding and self.encoding.encode then
+		return self.encoding.encode(str);
 	end
+	return str;
 end
 
 function ConstantArray:apply(ast, pipeline)
 	self.rootScope = ast.body.scope;
 	self.arrId     = self.rootScope:addVariable();
 
-	self.base64chars = table.concat(util.shuffle{
-		"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
-		"0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-		"+", "/",
-	});
+	-- Select and initialize encoding
+	if self.Encoding ~= "none" then
+		local encodingType = self.Encoding;
+
+		-- If "random", select random encoding
+		if encodingType == "random" then
+			local encodingTypes = {"base64", "base85", "hex", "rle", "hybrid"};
+			encodingType = encodingTypes[math.random(1, #encodingTypes)];
+		end
+
+		-- Load and initialize selected encoding
+		if encodingType == "base64" then
+			self.encoding = require("prometheus.steps.ConstantArray.encodings.base64_custom");
+		elseif encodingType == "base85" then
+			self.encoding = require("prometheus.steps.ConstantArray.encodings.base85");
+		elseif encodingType == "hex" then
+			self.encoding = require("prometheus.steps.ConstantArray.encodings.hex_shuffle");
+		elseif encodingType == "rle" then
+			self.encoding = require("prometheus.steps.ConstantArray.encodings.rle");
+		elseif encodingType == "hybrid" then
+			self.encoding = require("prometheus.steps.ConstantArray.encodings.hybrid");
+		end
+
+		-- Initialize encoding
+		if self.encoding and self.encoding.init then
+			self.encoding.init();
+		end
+	end
 
 	self.constants = {};
 	self.lookup    = {};

@@ -37,6 +37,8 @@
 
 ✅ **Phase 4, Objective 4.1: Opaque Predicates** - Control flow obfuscation using 9 mathematically guaranteed predicate variants (6 always-true, 3 always-false) implemented and integrated into all presets
 
+✅ **Phase 3, Objective 3.2: Dynamic Encoding Schemes** - 5 encoding variants (Base64 Custom, Base85, Hex Shuffle, RLE, Hybrid) implemented with random selection per file, achieving 0% string encoding pattern correlation across files
+
 ### In Progress
 
 None
@@ -67,7 +69,7 @@ All remaining objectives per roadmap
 
 **Low Impact Issues**:
 11. **Predictable Watermark Locations** - AntiTamper insertion points are static
-12. **Fixed Base64 Character Shuffle** - ConstantArray encoding is consistent per seed
+12. ~~**Fixed Base64 Character Shuffle**~~ - ✅ FIXED (Phase 3.2: 5 dynamic encoding schemes with random per-file selection)
 
 ---
 
@@ -679,23 +681,6 @@ Implement 15 expression generators to maximize expression diversity per number l
 
 ---
 
-#### **Objective 11.2: Constant-Time Output Generation**
-**Problem**: Obfuscation time could leak information about techniques used.
-
-**Solution**:
-- Normalize obfuscation time across different files
-- Add random delays to equalize timing
-- Make timing independent of step selection
-- Prevent timing-based fingerprinting
-
-**Implementation**:
-- `src/prometheus/pipeline.lua`: Add timing normalization
-- Random delay injection
-
-**Success Metric**: Obfuscation time variations are unpredictable and uninformative.
-
----
-
 ## Implementation Priority Matrix
 
 ### **Critical Priority** (Highest Impact on Uniqueness)
@@ -715,7 +700,7 @@ Implement 15 expression generators to maximize expression diversity per number l
 10. Phase 10: Preset Randomization - **Objective 10.2**
 
 ### **Low Priority** (Polishing & Anti-Analysis)
-11. Phase 11: Anti-Pattern-Analysis Features - **Objective 11.1 & 11.2**
+11. Phase 11: Anti-Pattern-Analysis Features - **Objective 11.1**
 
 ---
 
