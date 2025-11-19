@@ -265,14 +265,15 @@ function Pipeline:getIdealStepOrder()
 		"Split Strings",          -- 2. Split strings (string operations together)
 		"Anti Tamper",            -- 3. Add anti-tamper checks early
 		"Dead Code Injection",    -- 4. Inject dead code before obfuscation
-		"Statement Shuffle",      -- 5. Shuffle statements before structural changes
-		"Proxify Locals",         -- 6. Wrap locals in proxy structures
-		"Numbers To Expressions", -- 7. CRITICAL: After ProxifyLocals, before Vmify/ConstantArray
-		"Vmify",                  -- 8. VM transformation (generates many numbers)
-		"Constant Array",         -- 9. Extract constants to arrays
-		"Add Vararg",             -- 10. Add vararg parameters
-		"Watermark Check",        -- 11. Add watermark verification
-		"Wrap in Function",       -- 12. Final function wrapping
+		"Control Flow Flatten",   -- 5. Inject opaque predicates to obfuscate control flow
+		"Statement Shuffle",      -- 6. Shuffle statements before structural changes
+		"Proxify Locals",         -- 7. Wrap locals in proxy structures
+		"Numbers To Expressions", -- 8. CRITICAL: After ProxifyLocals, before Vmify/ConstantArray
+		"Vmify",                  -- 9. VM transformation (generates many numbers)
+		"Constant Array",         -- 10. Extract constants to arrays
+		"Add Vararg",             -- 11. Add vararg parameters
+		"Watermark Check",        -- 12. Add watermark verification
+		"Wrap in Function",       -- 13. Final function wrapping
 	};
 end
 

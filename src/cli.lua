@@ -38,6 +38,65 @@ local function lines_from(file)
     return lines
   end
 
+-- Step Name Mapping: CLI argument -> Step registry key
+-- These map to the keys in src/prometheus/steps.lua
+local stepMapping = {
+	["control-flow-flatten"] = "ControlFlowFlatten",
+	["proxify-locals"] = "ProxifyLocals",
+	["constant-array"] = "ConstantArray",
+	["wrap-in-function"] = "WrapInFunction",
+	["numbers-to-expressions"] = "NumbersToExpressions",
+	["anti-tamper"] = "AntiTamper",
+	["watermark-check"] = "WatermarkCheck",
+	["encrypt-strings"] = "EncryptStrings",
+	["add-vararg"] = "AddVararg",
+	["watermark"] = "Watermark",
+	["statement-shuffle"] = "StatementShuffle",
+	["vmify"] = "Vmify",
+	["dead-code-injection"] = "DeadCodeInjection",
+	["split-strings"] = "SplitStrings",
+};
+
+-- Parse step settings from arguments
+-- Format: Key=Value Key2=Value2
+-- Returns table of {Key = Value, Key2 = Value2}
+local function parseStepSettings(args, startIndex, maxIndex)
+	local settings = {};
+	local i = startIndex;
+
+	while i <= maxIndex do
+		local arg = args[i];
+
+		-- Stop if we hit another flag
+		if arg:sub(1, 2) == "--" then
+			break;
+		end
+
+		-- Parse Key=Value
+		local key, value = arg:match("^([^=]+)=(.+)$");
+		if key and value then
+			-- Try to convert to number
+			local numValue = tonumber(value);
+			if numValue then
+				settings[key] = numValue;
+			-- Try to convert to boolean
+			elseif value:lower() == "true" then
+				settings[key] = true;
+			elseif value:lower() == "false" then
+				settings[key] = false;
+			else
+				-- Keep as string
+				settings[key] = value;
+			end
+			i = i + 1;
+		else
+			break;
+		end
+	end
+
+	return settings, i - 1;
+end
+
 -- CLI
 local config;
 local sourceFile;
@@ -45,6 +104,7 @@ local outFile;
 local luaVersion;
 local prettyPrint;
 local seedOverride;
+local cliSteps = {}; -- Steps specified via CLI
 
 Prometheus.colors.enabled = true;
 
@@ -116,7 +176,23 @@ while i <= #arg do
                 os.exit(1);
             end;
         else
-            Prometheus.Logger:warn(string.format("The option \"%s\" is not valid and therefore ignored", curr));
+            -- Check if this is a step argument
+            local stepArg = curr:sub(3); -- Remove "--" prefix
+            local stepName = stepMapping[stepArg];
+
+            if stepName then
+                -- Parse step settings
+                local settings, lastIndex = parseStepSettings(arg, i + 1, #arg);
+                i = lastIndex;
+
+                -- Add step to CLI steps
+                table.insert(cliSteps, {
+                    Name = stepName,
+                    Settings = settings
+                });
+            else
+                Prometheus.Logger:warn(string.format("The option \"%s\" is not valid and therefore ignored", curr));
+            end
         end
     else
         if sourceFile then
@@ -131,7 +207,32 @@ if not sourceFile then
     Prometheus.Logger:error("No input file was specified!")
 end
 
-if not config then
+-- Build config from CLI steps if provided
+if #cliSteps > 0 then
+    if not config then
+        -- No preset specified, build config from CLI steps only
+        config = {
+            LuaVersion = luaVersion or "Lua51",
+            VarNamePrefix = "",
+            NameGenerator = "MangledShuffled",
+            PrettyPrint = prettyPrint ~= nil and prettyPrint or false,
+            Seed = seedOverride or 0,
+            Steps = cliSteps
+        };
+    else
+        -- Preset specified, append CLI steps to preset steps
+        -- Create a copy to avoid modifying the original preset
+        local mergedSteps = {};
+        for _, step in ipairs(config.Steps or {}) do
+            table.insert(mergedSteps, step);
+        end
+        for _, step in ipairs(cliSteps) do
+            table.insert(mergedSteps, step);
+        end
+        config.Steps = mergedSteps;
+    end
+elseif not config then
+    -- No config, no CLI steps - fall back to Minify preset
     Prometheus.Logger:warn("No config was specified, falling back to Minify preset");
     config = Prometheus.Presets.Minify;
 end

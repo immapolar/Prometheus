@@ -11,4 +11,5 @@ return {
 	WatermarkCheck		   = require("prometheus.steps.WatermarkCheck");
 	DeadCodeInjection    = require("prometheus.steps.DeadCodeInjection");
 	StatementShuffle     = require("prometheus.steps.StatementShuffle");
+	ControlFlowFlatten   = require("prometheus.steps.ControlFlowFlatten");
 }

@@ -19,6 +19,14 @@ return {
         -- Obfuscation steps
         Steps = {
             {
+                Name = "ControlFlowFlatten";
+                Settings = {
+                    Enabled = true;
+                    Percentage = 0.3;
+                    MaxDepth = 1;
+                };
+            },
+            {
                 Name = "Vmify";
                 Settings = {
 
@@ -65,6 +73,14 @@ return {
                 Settings = {
                     UseDebug = false;         -- Set to false for better FiveM compatibility
                     RandomSeed = true;
+                };
+            },
+            {
+                Name = "ControlFlowFlatten";
+                Settings = {
+                    Enabled = true;
+                    Percentage = 0.5;
+                    MaxDepth = 2;
                 };
             },
             {
@@ -129,6 +145,14 @@ return {
                 };
             },
             {
+                Name = "ControlFlowFlatten";
+                Settings = {
+                    Enabled = true;
+                    Percentage = 0.7;
+                    MaxDepth = 3;
+                };
+            },
+            {
                 Name = "ProxifyLocals";
                 Settings = {
                     LiteralType = "number";
@@ -188,6 +212,14 @@ return {
                     MinPercentage = 0.05;
                     MaxPercentage = 0.15;
                     MaxExpressionDepth = 3;
+                };
+            },
+            {
+                Name = "ControlFlowFlatten";
+                Settings = {
+                    Enabled = true;
+                    Percentage = 0.6;
+                    MaxDepth = 2;
                 };
             },
             {
@@ -273,6 +305,14 @@ return {
                     MinPercentage = 0.10;
                     MaxPercentage = 0.25;
                     MaxExpressionDepth = 4;
+                };
+            },
+            {
+                Name = "ControlFlowFlatten";
+                Settings = {
+                    Enabled = true;
+                    Percentage = 0.7;
+                    MaxDepth = 3;
                 };
             },
             {
@@ -363,6 +403,14 @@ return {
                     MinPercentage = 0.15;
                     MaxPercentage = 0.30;
                     MaxExpressionDepth = 5;
+                };
+            },
+            {
+                Name = "ControlFlowFlatten";
+                Settings = {
+                    Enabled = true;
+                    Percentage = 0.8;
+                    MaxDepth = 4;
                 };
             },
             {
