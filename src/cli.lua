@@ -134,9 +134,12 @@ while i <= #arg do
 
             local content = table.concat(lines_from(filename), "\n");
             -- Load Config from File
-            local func = loadstring(content);
-            -- Sandboxing
-            setfenv(func, {});
+            -- Lua 5.1 compatibility: loadstring / Lua 5.4: load
+            local func = (loadstring or load)(content);
+            -- Sandboxing (Lua 5.1: setfenv / Lua 5.4: _ENV parameter not needed for configs)
+            if setfenv then
+                setfenv(func, {});
+            end
             config = func();
         elseif curr == "--out" or curr == "--o" then
             i = i + 1;
