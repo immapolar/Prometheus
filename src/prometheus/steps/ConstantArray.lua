@@ -94,6 +94,21 @@ ConstantArray.SettingsDescriptor = {
 			"rle",
 			"hybrid",
 		},
+	};
+	IndexingStrategy = {
+		name = "IndexingStrategy",
+		description = "The Indexing Strategy to use for constant array access",
+		type = "enum",
+		default = "random",
+		values = {
+			"random",
+			"direct",
+			"mathematical",
+			"bitwise",
+			"indirection",
+			"function_chain",
+			"hybrid",
+		},
 	}
 }
 
@@ -346,6 +361,36 @@ function ConstantArray:apply(ast, pipeline)
 		end
 	end
 
+	-- Select indexing strategy (will be initialized after constants are collected)
+	local indexingStrategyType = self.IndexingStrategy;
+
+	-- If "random", select random strategy
+	if indexingStrategyType == "random" then
+		local strategyTypes = {"direct", "mathematical", "indirection", "function_chain", "hybrid"};
+
+		-- Add bitwise only for Lua 5.4
+		if pipeline.LuaVersion == enums.LuaVersion.Lua54 then
+			table.insert(strategyTypes, "bitwise");
+		end
+
+		indexingStrategyType = strategyTypes[math.random(1, #strategyTypes)];
+	end
+
+	-- Load selected indexing strategy
+	if indexingStrategyType == "direct" then
+		self.indexingStrategy = require("prometheus.steps.ConstantArray.indexing.direct_offset");
+	elseif indexingStrategyType == "mathematical" then
+		self.indexingStrategy = require("prometheus.steps.ConstantArray.indexing.mathematical");
+	elseif indexingStrategyType == "bitwise" then
+		self.indexingStrategy = require("prometheus.steps.ConstantArray.indexing.bitwise");
+	elseif indexingStrategyType == "indirection" then
+		self.indexingStrategy = require("prometheus.steps.ConstantArray.indexing.indirection");
+	elseif indexingStrategyType == "function_chain" then
+		self.indexingStrategy = require("prometheus.steps.ConstantArray.indexing.function_chain");
+	elseif indexingStrategyType == "hybrid" then
+		self.indexingStrategy = require("prometheus.steps.ConstantArray.indexing.hybrid");
+	end
+
 	self.constants = {};
 	self.lookup    = {};
 
@@ -366,8 +411,13 @@ function ConstantArray:apply(ast, pipeline)
 		end
 	end);
 
-	-- Shuffle Array
-	if self.Shuffle then
+	-- Initialize indexing strategy with array length (before shuffle check)
+	if self.indexingStrategy and self.indexingStrategy.init then
+		self.indexingStrategy.init(#self.constants);
+	end
+
+	-- Shuffle Array (only if strategy doesn't provide its own shuffling)
+	if self.Shuffle and not (self.indexingStrategy and self.indexingStrategy.disablesShuffle) then
 		self.constants = util.shuffle(self.constants);
 		self.lookup    = {};
 		for i, v in ipairs(self.constants) do
@@ -375,8 +425,26 @@ function ConstantArray:apply(ast, pipeline)
 		end
 	end
 
+	-- Remap array if strategy provides custom indexing formula
+	-- This ensures that constants[logical_i] is placed at constants[formula(logical_i)]
+	if self.indexingStrategy and self.indexingStrategy.remapArray then
+		self.constants = self.indexingStrategy.remapArray(self.constants);
+		-- Note: lookup table remains unchanged as it maps value -> logical index
+	end
+
+	-- Create INDEX_MAP if needed for indirection strategy
+	if self.indexingStrategy and self.indexingStrategy.needsIndexMap then
+		self.indexMapId = self.rootScope:addVariable();
+	end
+
 	-- Set Wrapper Function Offset
-	self.wrapperOffset = math.random(-self.MaxWrapperOffset, self.MaxWrapperOffset);
+	-- For strategies that use non-linear formulas (mathematical, bitwise, function_chain),
+	-- wrapperOffset cannot be used because it's applied before the formula
+	if self.indexingStrategy and self.indexingStrategy.disablesShuffle then
+		self.wrapperOffset = 0;  -- No offset for formula-based strategies
+	else
+		self.wrapperOffset = math.random(-self.MaxWrapperOffset, self.MaxWrapperOffset);
+	end
 	self.wrapperId     = self.rootScope:addVariable();
 
 	visitast(ast, function(node, data)
@@ -485,37 +553,43 @@ function ConstantArray:apply(ast, pipeline)
 
 	local steps = util.shuffle({
 		-- Add Wrapper Function Code
-		function() 
+		function()
 			local funcScope = Scope:new(self.rootScope);
 			-- Add Reference to Array
 			funcScope:addReferenceToHigherScope(self.rootScope, self.arrId);
 
 			local arg = funcScope:addVariable();
-			local addSubArg;
 
-			-- Create add and Subtract code
-			if self.wrapperOffset < 0 then
-				addSubArg = Ast.SubExpression(Ast.VariableExpression(funcScope, arg), Ast.NumberExpression(-self.wrapperOffset));
+			-- Generate indexing expression using selected strategy
+			local arrayRef = Ast.VariableExpression(self.rootScope, self.arrId);
+			local indexMapRef = nil;
+
+			-- Add reference to INDEX_MAP if needed
+			if self.indexingStrategy and self.indexingStrategy.needsIndexMap then
+				funcScope:addReferenceToHigherScope(self.rootScope, self.indexMapId);
+				indexMapRef = Ast.VariableExpression(self.rootScope, self.indexMapId);
+			end
+
+			local indexExpr;
+			if self.indexingStrategy and self.indexingStrategy.generateIndexExpression then
+				indexExpr = self.indexingStrategy.generateIndexExpression(funcScope, arg, arrayRef, indexMapRef, self.wrapperOffset);
 			else
-				addSubArg = Ast.AddExpression(Ast.VariableExpression(funcScope, arg), Ast.NumberExpression(self.wrapperOffset));
+				-- Fallback to direct offset (should not happen)
+				local addSubArg;
+				if self.wrapperOffset < 0 then
+					addSubArg = Ast.SubExpression(Ast.VariableExpression(funcScope, arg), Ast.NumberExpression(-self.wrapperOffset));
+				else
+					addSubArg = Ast.AddExpression(Ast.VariableExpression(funcScope, arg), Ast.NumberExpression(self.wrapperOffset));
+				end
+				indexExpr = Ast.IndexExpression(arrayRef, addSubArg);
 			end
 
 			-- Create and Add the Function Declaration
 			table.insert(ast.body.statements, 1, Ast.LocalFunctionDeclaration(self.rootScope, self.wrapperId, {
 				Ast.VariableExpression(funcScope, arg)
 			}, Ast.Block({
-				Ast.ReturnStatement({
-					Ast.IndexExpression(
-						Ast.VariableExpression(self.rootScope, self.arrId),
-						addSubArg
-					)
-				});
+				Ast.ReturnStatement({indexExpr});
 			}, funcScope)));
-
-			-- Resulting Code:
-			-- function xy(a)
-			-- 		return ARR[a - 10]
-			-- end
 		end,
 		-- Rotate Array and Add unrotate code
 		function()
@@ -534,6 +608,12 @@ function ConstantArray:apply(ast, pipeline)
 
 	-- Add the Array Declaration
 	table.insert(ast.body.statements, 1, Ast.LocalVariableDeclaration(self.rootScope, {self.arrId}, {self:createArray()}));
+
+	-- Add INDEX_MAP table if needed for indirection strategy
+	if self.indexingStrategy and self.indexingStrategy.needsIndexMap and self.indexMapId then
+		local indexMapTable = self.indexingStrategy.createIndexMapTable();
+		table.insert(ast.body.statements, 2, Ast.LocalVariableDeclaration(self.rootScope, {self.indexMapId}, {indexMapTable}));
+	end
 
 	self.rootScope = nil;
 	self.arrId     = nil;
