@@ -251,29 +251,34 @@ function Pipeline:getIdealStepOrder()
 	-- of step dependencies, transformations, and interactions.
 	--
 	-- Key principles:
-	-- 1. String operations (EncryptStrings, SplitStrings) come first
-	-- 2. ProxifyLocals comes before VM/Array transformations
-	-- 3. NumbersToExpressions MUST come after ProxifyLocals but before Vmify/ConstantArray
+	-- 1. Watermarking operations come first (watermark gets obfuscated)
+	-- 2. Structural changes (AddVararg) early, before content obfuscation
+	-- 3. String operations (SplitStrings, EncryptStrings) early
+	-- 4. Anti-analysis and fake code injection (AntiTamper, DeadCodeInjection, SignaturePoisoning) together
+	-- 5. ProxifyLocals comes before NumbersToExpressions
+	-- 6. NumbersToExpressions MUST come after ProxifyLocals but before ConstantArray/Vmify
 	--    (This prevents NumbersToExpressions from corrupting VM opcodes and array indices)
-	-- 4. Structural transformations (Vmify, ConstantArray) come late
-	-- 5. Wrapping operations (WrapInFunction) come last
+	-- 7. Heavy transformations (ControlFlowFlatten, Vmify) come late
+	-- 8. Wrapping operations (WrapInFunction) come last
 	--
 	-- This ordering is ENFORCED automatically and cannot be overridden.
 
 	return {
-		"Encrypt Strings",        -- 1. Encrypt string literals early
-		"Split Strings",          -- 2. Split strings (string operations together)
-		"Anti Tamper",            -- 3. Add anti-tamper checks early
-		"Dead Code Injection",    -- 4. Inject dead code before obfuscation
-		"Control Flow Flatten",   -- 5. Inject opaque predicates to obfuscate control flow
-		"Statement Shuffle",      -- 6. Shuffle statements before structural changes
-		"Proxify Locals",         -- 7. Wrap locals in proxy structures
-		"Numbers To Expressions", -- 8. CRITICAL: After ProxifyLocals, before Vmify/ConstantArray
-		"Vmify",                  -- 9. VM transformation (generates many numbers)
-		"Constant Array",         -- 10. Extract constants to arrays
-		"Add Vararg",             -- 11. Add vararg parameters
-		"Watermark Check",        -- 12. Add watermark verification
-		"Wrap in Function",       -- 13. Final function wrapping
+		"Watermark",              -- 1. Add watermark first (gets obfuscated by later steps)
+		"Watermark Check",        -- 2. Add watermark verification
+		"Add Vararg",             -- 3. Structural change to function signatures
+		"Split Strings",          -- 4. Split strings first
+		"Encrypt Strings",        -- 5. Then encrypt strings
+		"Anti Tamper",            -- 6. Add anti-tamper checks
+		"Dead Code Injection",    -- 7. Inject dead code
+		"Signature Poisoning",    -- 8. Inject fake obfuscator signatures
+		"Proxify Locals",         -- 9. Wrap locals in proxy structures
+		"Statement Shuffle",      -- 10. Shuffle statements
+		"Numbers To Expressions", -- 11. CRITICAL: After ProxifyLocals, before ConstantArray/Vmify
+		"Constant Array",         -- 12. Extract constants to arrays
+		"Control Flow Flatten",   -- 13. Flatten control flow (late transformation)
+		"Vmify",                  -- 14. VM transformation (very late)
+		"Wrap in Function",       -- 15. Final function wrapping
 	};
 end
 

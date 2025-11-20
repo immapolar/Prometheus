@@ -8,6 +8,7 @@ return {
 	EncryptStrings 			 = require("prometheus.steps.EncryptStrings");
 	NumbersToExpressions = require("prometheus.steps.NumbersToExpressions");
 	AddVararg 					 = require("prometheus.steps.AddVararg");
+	Watermark            = require("prometheus.steps.Watermark");
 	WatermarkCheck		   = require("prometheus.steps.WatermarkCheck");
 	DeadCodeInjection    = require("prometheus.steps.DeadCodeInjection");
 	SignaturePoisoning   = require("prometheus.steps.SignaturePoisoning");
