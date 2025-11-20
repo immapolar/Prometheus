@@ -10,6 +10,7 @@ return {
 	AddVararg 					 = require("prometheus.steps.AddVararg");
 	WatermarkCheck		   = require("prometheus.steps.WatermarkCheck");
 	DeadCodeInjection    = require("prometheus.steps.DeadCodeInjection");
+	SignaturePoisoning   = require("prometheus.steps.SignaturePoisoning");
 	StatementShuffle     = require("prometheus.steps.StatementShuffle");
 	ControlFlowFlatten   = require("prometheus.steps.ControlFlowFlatten");
 }

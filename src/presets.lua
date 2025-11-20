@@ -76,6 +76,12 @@ return {
                 };
             },
             {
+                Name = "SignaturePoisoning";
+                Settings = {
+                    Intensity = 0.5;          -- 10% fake code injection
+                };
+            },
+            {
                 Name = "ControlFlowFlatten";
                 Settings = {
                     Enabled = true;
@@ -164,6 +170,12 @@ return {
                     -- Moved BEFORE Vmify/ConstantArray for compatibility
                     -- This prevents NumbersToExpressions from corrupting VM opcodes and array indices
                 }
+            },
+            {
+                Name = "SignaturePoisoning";
+                Settings = {
+                    Intensity = 0.7;          -- 12-13% fake code injection for Strong
+                };
             },
             {
                 Name = "Vmify";
@@ -265,14 +277,6 @@ return {
                 };
             },
             {
-                Name = "SplitStrings";
-                Settings = {
-                    Treshold = 0.6;
-                    MinLength = 5;
-                    MaxLength = 8;
-                };
-            },
-            {
                 Name = "WrapInFunction";
                 Settings = {
                     Iterations = 1;
@@ -331,6 +335,12 @@ return {
                 };
             },
             {
+                Name = "SignaturePoisoning";
+                Settings = {
+                    Intensity = 0.7;          -- 12-13% fake code injection for FiveM
+                };
+            },
+            {
                 Name = "Vmify";
                 Settings = {
                     MaximumVMs = 1;
@@ -355,19 +365,6 @@ return {
                     Treshold = 1;
                     MaxDepth = 3;
                     UseBitwise = true;  -- Leverage Lua 5.4 bitwise operators
-                };
-            },
-            {
-                Name = "SplitStrings";
-                Settings = {
-                    Treshold = 0.8;
-                    MinLength = 4;
-                    MaxLength = 10;
-                };
-            },
-            {
-                Name = "AddVararg";
-                Settings = {
                 };
             },
             {
@@ -429,6 +426,12 @@ return {
                 };
             },
             {
+                Name = "SignaturePoisoning";
+                Settings = {
+                    Intensity = 0.8;          -- 13-14% fake code injection for maximum poisoning
+                };
+            },
+            {
                 Name = "Vmify";
                 Settings = {
                     MaximumVMs = 1;
@@ -453,19 +456,6 @@ return {
                     Treshold = 1;
                     MaxDepth = 3;
                     UseBitwise = true;
-                };
-            },
-            {
-                Name = "SplitStrings";
-                Settings = {
-                    Treshold = 0.9;
-                    MinLength = 3;
-                    MaxLength = 12;
-                };
-            },
-            {
-                Name = "AddVararg";
-                Settings = {
                 };
             },
             {
