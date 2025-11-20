@@ -287,10 +287,15 @@ end
 -- this function needs a settings object with the following properties
 -- Keywords => forbidden Variable Names
 -- generateName(id, scope, originalName) => function to generate unique variable name based on the id and scope
-function Scope:renameVariables(settings)
+-- sharedForbiddenNames => optional table shared across sibling scopes to prevent collisions
+function Scope:renameVariables(settings, sharedForbiddenNames)
+	-- SIBLING COLLISION FIX: Share forbidden names across sibling scopes
+	-- Sibling scopes may be concatenated at the same Lua lexical level,
+	-- so they must not reuse variable names to avoid collisions.
+	local forbiddenNamesLookup = sharedForbiddenNames or {};
+
 	if(not self.isGlobal) then
 		local prefix = settings.prefix or "";
-		local forbiddenNamesLookup = {};
 		for _, keyword in pairs(settings.Keywords) do
 			forbiddenNamesLookup[keyword] = true;
 		end
@@ -328,7 +333,7 @@ function Scope:renameVariables(settings)
 		end
 		
 		self.variablesLookup = {};
-		
+
 		local i = 0;
 		for id, originalName in pairs(self.variables) do
 			if(not self.skipIdLookup[id] and (self.referenceCounts[id] or 0) >= 0) then
@@ -343,12 +348,19 @@ function Scope:renameVariables(settings)
 
 				self.variables[id] = name;
 				self.variablesLookup[name] = id;
+				-- CRITICAL FIX: Prevent intra-scope variable name collisions
+				-- After assigning a name to a variable, mark it as forbidden to prevent
+				-- the name generator from reusing it for another variable in the same scope.
+				-- Without this, seed-dependent collisions occur when the random name generator
+				-- produces the same name for different variable IDs in the same iteration.
+				forbiddenNamesLookup[name] = true;
 			end
 		end
 	end
-	
+
+	-- Pass the shared forbidden names table to all children to prevent sibling collisions
 	for _, scope in pairs(self.children) do
-		scope:renameVariables(settings);
+		scope:renameVariables(settings, forbiddenNamesLookup);
 	end
 end
 
