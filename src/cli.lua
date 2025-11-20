@@ -55,6 +55,7 @@ local stepMapping = {
 	["vmify"] = "Vmify",
 	["dead-code-injection"] = "DeadCodeInjection",
 	["split-strings"] = "SplitStrings",
+	["poison"] = "SignaturePoisoning",
 };
 
 -- Parse step settings from arguments
@@ -178,6 +179,55 @@ while i <= #arg do
 
                 os.exit(1);
             end;
+        elseif curr == "--poison" then
+            -- Special handling for SignaturePoisoning with flexible intensity
+            local settings = {};
+            local intensity;
+
+            -- Check if next argument exists and is not a flag
+            if i + 1 <= #arg and arg[i + 1]:sub(1, 2) ~= "--" then
+                local nextArg = arg[i + 1];
+
+                -- Check if it's a direct numeric value (e.g., --poison 0.5)
+                local directValue = tonumber(nextArg);
+                if directValue then
+                    -- Validate range
+                    if directValue < 0.0 or directValue > 1.0 then
+                        Prometheus.Logger:error(string.format("Invalid --poison intensity \"%s\". Must be between 0.0 and 1.0.", tostring(nextArg)));
+                    end
+                    intensity = directValue;
+                    i = i + 1;
+                -- Check if it's Key=Value format (e.g., --poison Intensity=0.5)
+                elseif nextArg:match("^[^=]+=.+$") then
+                    -- Parse settings using existing function
+                    local parsedSettings, lastIndex = parseStepSettings(arg, i + 1, #arg);
+                    settings = parsedSettings;
+                    i = lastIndex;
+                else
+                    -- Not a valid argument, treat as random intensity
+                    intensity = nil;
+                end
+            else
+                -- No argument or next is a flag, use random intensity
+                intensity = nil;
+            end
+
+            -- If no explicit intensity, generate random (0.3-0.7)
+            if not intensity and not settings.Intensity then
+                intensity = 0.3 + (math.random() * 0.4); -- Random between 0.3 and 0.7
+                Prometheus.Logger:info(string.format("SignaturePoisoning: Using random intensity %.2f", intensity));
+            end
+
+            -- Set intensity if determined
+            if intensity then
+                settings.Intensity = intensity;
+            end
+
+            -- Add step to CLI steps
+            table.insert(cliSteps, {
+                Name = "SignaturePoisoning",
+                Settings = settings
+            });
         else
             -- Check if this is a step argument
             local stepArg = curr:sub(3); -- Remove "--" prefix
